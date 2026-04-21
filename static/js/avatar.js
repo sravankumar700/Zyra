@@ -7,7 +7,7 @@
   let proctor = null;
   let startedAt = Date.now();
   let submitting = false;
-  let seconds = 60 * 60;
+  let seconds = 45 * 60;
   let timerInterval = null;
   let recognition = null;
   let finalTranscript = '';

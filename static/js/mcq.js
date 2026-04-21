@@ -5,7 +5,7 @@
   let answers = {};
   let testId = null;
   let timerInterval;
-  let seconds = 60 * 60;
+  let seconds = 30 * 60;
   let proctor = null;
   let submitting = false;
   let pendingAutoSubmit = false;
