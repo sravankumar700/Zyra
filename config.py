@@ -6,12 +6,14 @@ load_dotenv()
 
 class Config:
     RUNNING_ON_VERCEL = bool(os.getenv("VERCEL") or os.getenv("VERCEL_ENV"))
+    RUNNING_ON_RENDER = os.getenv("RENDER", "").lower() == "true"
+    RUNNING_ON_CLOUD = RUNNING_ON_VERCEL or RUNNING_ON_RENDER
     USE_LOCAL_VIRTUAL_MODEL = os.getenv("USE_LOCAL_VIRTUAL_MODEL", "false").lower() == "true"
     OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434/api/generate")
     OLLAMA_URL_IS_LOCAL = OLLAMA_URL.startswith(("http://127.0.0.1", "http://localhost", "http://0.0.0.0"))
     MCQ_USE_OLLAMA = (
         os.getenv("MCQ_USE_OLLAMA", "true").lower() == "true"
-        and not (RUNNING_ON_VERCEL and OLLAMA_URL_IS_LOCAL)
+        and not (RUNNING_ON_CLOUD and OLLAMA_URL_IS_LOCAL)
     )
     OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "phi3:mini")
     MCQ_OLLAMA_MODEL = os.getenv("MCQ_OLLAMA_MODEL", OLLAMA_MODEL)

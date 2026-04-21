@@ -9,7 +9,6 @@ uploads/
 sessions/
 .venv/
 venv/
-.python-version
 .vercel/
 .DS_Store
 Thumbs.db

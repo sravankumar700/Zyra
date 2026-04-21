@@ -280,7 +280,14 @@ The recent updates were checked with:
 
 ## Deployment Notes
 
-- `vercel.json` is present for deployment-related setup.
+- Render deployment is configured with `render.yaml`.
+- Render settings:
+  - Build Command: `pip install -r requirements.txt`
+  - Start Command: `gunicorn app:app`
+  - Runtime: Python, pinned by `.python-version`
+- Add the secret environment variables from `.env` in the Render dashboard or Blueprint setup form. Do not commit secret values to `render.yaml`.
+- `MCQ_USE_OLLAMA` is set to `false` on Render because local Ollama at `127.0.0.1` is not available in hosted deployment.
+- `vercel.json` is present for Vercel-related setup.
 - Resume files are uploaded to Cloudinary and only the hosted URL is stored.
 - MongoDB is required for the full live workflow.
 - If external services are not available, some frontend flows may fall back to mock/demo behavior already present in the project.
@@ -304,6 +311,5 @@ Whenever the project changes again, keep this README updated in these sections:
 ## Maintainer Note
 
 If you change the HR dashboard UI, candidate application flow, or job schema again, update both the backend job payload in `app.py` and the frontend preview/render logic in `templates/main.html` and `templates/register.html` so the dashboard and candidate flows stay in sync.
-
 
 
