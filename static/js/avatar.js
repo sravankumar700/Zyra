@@ -13,6 +13,8 @@
   let finalTranscript = '';
   let interviewStarted = false;
   let pendingAutoSubmit = false;
+  let totalQuestions = 0;
+  let loadingNextQuestion = false;
 
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
@@ -48,6 +50,39 @@
       startBtn.disabled = true;
       startBtn.textContent = 'Submitting...';
     }
+  }
+
+  function escapeHtml(value) {
+    return String(value || '').replace(/[&<>"']/g, char => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#039;'
+    }[char]));
+  }
+
+  function showSubmissionPopup({ title, message, redirectUrl = 'user_dashboard.html' }) {
+    const existing = document.querySelector('.submission-popup-backdrop');
+    if (existing) existing.remove();
+
+    const backdrop = document.createElement('div');
+    backdrop.className = 'submission-popup-backdrop';
+    backdrop.innerHTML = `
+      <div class="submission-popup" role="dialog" aria-modal="true" aria-labelledby="submission-title">
+        <div class="submission-check" aria-hidden="true"></div>
+        <h2 id="submission-title">${escapeHtml(title || 'Interview Submitted')}</h2>
+        <p>${escapeHtml(message || 'Your interview has been submitted successfully.')}</p>
+        <button type="button" class="submission-popup-btn">Back to Dashboard</button>
+      </div>
+    `;
+    document.body.appendChild(backdrop);
+
+    const finish = () => {
+      window.location.href = redirectUrl;
+    };
+    backdrop.querySelector('.submission-popup-btn')?.addEventListener('click', finish);
+    setTimeout(finish, 2600);
   }
 
   function renderTimer() {
@@ -93,12 +128,21 @@
       }, 200);
     }
     const progEl = document.getElementById('q-progress');
-    if (progEl) progEl.textContent = `Question ${idx + 1} of ${questions.length}`;
+    if (progEl) progEl.textContent = `Question ${idx + 1} of ${totalQuestions || questions.length}`;
+    updateQuestionButtons();
+  }
+
+  function updateQuestionButtons() {
+    const nextBtn = document.getElementById('next-question-btn');
+    const submitBtn = document.getElementById('submit-answer-btn');
+    const isFinal = totalQuestions > 0 && currentQ >= totalQuestions - 1;
+    if (nextBtn) nextBtn.textContent = isFinal ? 'Submit' : 'Next';
+    if (submitBtn) submitBtn.textContent = isFinal ? 'Submit Interview' : 'Submit Answer';
   }
 
   async function loadQuestions() {
     const el = document.getElementById('ai-question-text');
-    if (el) el.textContent = 'Generating your avatar interview questions...';
+    if (el) el.textContent = 'Preparing your first interview question...';
 
     const response = await fetch('/api/virtual/questions', { method: 'POST' });
     const data = await response.json().catch(() => ({}));
@@ -107,6 +151,7 @@
     questions = Array.isArray(data.questions) ? data.questions : [];
     if (!questions.length) throw new Error('No avatar interview questions were generated.');
 
+    totalQuestions = Number(data.planned_questions || data.total_questions) || questions.length;
     seconds = Number(data.duration_seconds) || seconds;
     currentQ = 0;
     answers = [];
@@ -139,7 +184,7 @@
   }
 
   function speakQuestion() {
-    if (submitting) return;
+    if (submitting || loadingNextQuestion) return;
     const question = questions[currentQ];
     if ('speechSynthesis' in window && question) {
       window.speechSynthesis.cancel();
@@ -239,21 +284,54 @@
     answers[currentQ] = responseText.trim();
   }
 
-  function submitAnswer() {
-    if (!interviewStarted || !questions.length || submitting) return;
+  async function submitAnswer() {
+    if (!interviewStarted || !questions.length || submitting || loadingNextQuestion) return;
     storeCurrentAnswer();
     toggleMic(false);
 
-    if (currentQ < questions.length - 1) {
-      currentQ++;
-      resetResponseBox();
-      loadQuestion(currentQ);
-      speakQuestion();
+    if (currentQ >= totalQuestions - 1) {
+      completeInterview(false);
       return;
     }
 
-    if (confirm('You have completed all interview questions. Submit interview?')) {
-      completeInterview(false);
+    const currentAnswer = answers[currentQ] || '';
+    if (!currentAnswer.trim()) {
+      setHint('Please answer this question before moving to the next one.');
+      return;
+    }
+
+    loadingNextQuestion = true;
+    setInterviewControlsDisabled(true);
+    const el = document.getElementById('ai-question-text');
+    if (el) el.textContent = 'Reviewing your answer and preparing the next question...';
+
+    try {
+      const response = await fetch('/api/virtual/respond', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question: questions[currentQ],
+          answer: currentAnswer,
+          next_index: currentQ + 1
+        })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Unable to prepare the next question.');
+      if (!data.next_question) throw new Error('The next interview question was not generated.');
+      totalQuestions = Number(data.planned_questions || totalQuestions) || totalQuestions;
+      questions[currentQ + 1] = data.next_question;
+      currentQ++;
+      resetResponseBox();
+      loadQuestion(currentQ);
+      loadingNextQuestion = false;
+      setInterviewControlsDisabled(false);
+      speakQuestion();
+    } catch (error) {
+      setHint(error.message || 'Unable to prepare the next question. Please try again.');
+      if (el) el.textContent = questions[currentQ] || 'Question unavailable';
+      setInterviewControlsDisabled(false);
+    } finally {
+      loadingNextQuestion = false;
     }
   }
 
@@ -296,8 +374,10 @@
         virtual_taken: true,
         virtual_round_enabled: true
       }));
-      alert('Interview submitted. HR will review your responses and update you soon.');
-      window.location.href = 'user_dashboard.html';
+      showSubmissionPopup({
+        title: 'Interview Submitted',
+        message: 'Your AI avatar interview was submitted successfully. HR will review your responses.'
+      });
     } catch (error) {
       submitting = false;
       if (seconds > 0 && interviewStarted) startTimer();
@@ -314,16 +394,24 @@
     }
 
     try {
+      await loadQuestions();
+
       proctor = new window.ZyraProctor({
         assessmentType: 'avatar',
         videoElement: document.getElementById('proctor-video'),
         onAutoSubmit: () => completeInterview(true)
       });
-      await proctor.start();
+      try {
+        await proctor.start();
+      } catch (proctorError) {
+        const status = document.getElementById('proctor-status');
+        if (status) status.textContent = proctorError.message || 'Camera and microphone access is required for proctoring.';
+      }
+
       startedAt = Date.now();
-      await loadQuestions();
       if (pendingAutoSubmit) {
         questions = questions.length ? questions : [];
+        totalQuestions = totalQuestions || questions.length;
         interviewStarted = true;
         await completeInterview(true);
         return;

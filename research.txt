@@ -1,0 +1,246 @@
+RESEARCH ON SOFTWARES SIMILAR TO ZYRA
+Research date: April 24, 2026
+
+1. What Zyra is, based on this project
+
+Zyra is not just an ATS. From the current project files and documentation, it combines:
+
+- Job publishing and a shared job catalog
+- Candidate application flow with resume upload
+- ATS-style resume screening and score calculation
+- MCQ screening
+- Optional coding round for technical candidates
+- Proctoring with warning tracking and auto-submission behavior
+- AI avatar interview / adaptive interview flow
+- HR-only candidate reports and recommendations
+
+This means the closest market comparison is not a single product category. Zyra overlaps with ATS platforms, assessment tools, video interview platforms, and technical screening tools.
+
+
+2. Similar software in the market
+
+Software 1: Workable
+Type: ATS + recruiting platform
+
+Main features
+- Job posting to 200+ job boards
+- Branded careers page and application workflow
+- AI-powered candidate summaries, match scores, and requirement checklists
+- One-way video interviews
+- Science-backed assessments
+- Candidate self-scheduling
+- 270+ integrations
+
+Drawbacks
+- Video interviews and assessments are treated as premium tools, so deeper screening is not equally available on every plan.
+- Workable's built-in interview format is mainly one-way video, which is less interactive than a live adaptive interview.
+- Many advanced hiring steps still depend on add-ons or third-party integrations.
+
+What Zyra improves compared with Workable
+- Zyra keeps resume screening, MCQ, coding, proctoring, and AI interview inside one custom flow instead of splitting some parts into premium add-ons.
+- Zyra includes a live interview experience with proctoring logic rather than only one-way prerecorded responses.
+- Zyra is more customizable for a project, campus, or organization-specific workflow.
+
+
+Software 2: Greenhouse
+Type: Enterprise hiring platform / ATS
+
+Main features
+- End-to-end hiring platform from sourcing to onboarding
+- Candidate portal with status updates and easier applications
+- Self-scheduling
+- Structured interview plans, interview kits, and scorecards
+- Built-in AI features
+- Fraud detection / identity verification through Greenhouse Real Talent
+- Large partner ecosystem with 439 listed integrations
+
+Drawbacks
+- Greenhouse is strong at process management, but interview and assessment depth often comes through partner tools and integrations.
+- Video interviewing is commonly handled through integrated tools such as Spark Hire, Zoom, Google Meet, and Microsoft Teams rather than a tightly built-in interview engine.
+- Inference: it is better suited to larger organizations with mature recruiting operations than to lightweight custom deployments.
+
+What Zyra improves compared with Greenhouse
+- Zyra provides a more tightly coupled screening path: application -> ATS score -> MCQ -> coding -> proctored AI interview -> HR report.
+- Zyra reduces tool-switching for assessment stages because the testing and interview logic are part of the same product flow.
+- Zyra gives direct control over custom thresholds, question generation, and stage progression rules.
+
+
+Software 3: Lever
+Type: ATS + CRM / Talent Relationship Management platform
+
+Main features
+- ATS combined with CRM-style candidate relationship management
+- Workflow automation
+- Recruitment analytics and dashboards
+- AI-generated interview transcripts and summaries
+- 300+ integrations
+
+Drawbacks
+- Lever is strongest in applicant tracking, pipeline management, and candidate relationship management, not in native proctored assessment flows.
+- Advanced testing, coding evaluation, or specialized interviewing usually depends on the surrounding integration ecosystem.
+- Inference: for teams wanting an all-in-one custom screening product, Lever may still require more external tooling than Zyra.
+
+What Zyra improves compared with Lever
+- Zyra has a built-in skills validation path rather than mainly a recruiting operations path.
+- Zyra includes role-based MCQ, optional coding, and AI interview logic in the same candidate lifecycle.
+- Zyra produces HR-only final reports from combined evidence instead of relying mainly on ATS pipeline activity and external assessment inputs.
+
+
+Software 4: HireVue
+Type: Interviewing and assessment platform
+
+Main features
+- Video interviewing
+- Structured interview guides
+- Assessments and skill validation
+- Conversational AI / candidate engagement
+- Scheduling automation
+- ATS integrations
+- Strong enterprise security and compliance positioning
+- Technical hiring support including coding-related screening options
+
+Drawbacks
+- HireVue is excellent for interviewing and assessments, but many organizations still use it alongside an existing ATS rather than as a simple custom-built all-in-one recruitment stack.
+- Inference: enterprise-grade breadth usually means higher cost and implementation complexity for smaller teams or student projects.
+- It is a powerful platform, but not as directly editable or logic-transparent as a custom system you control end-to-end.
+
+What Zyra improves compared with HireVue
+- Zyra combines job catalog, application intake, ATS scoring, assessment stages, proctoring, and final report generation inside one application.
+- Zyra is easier to adapt for custom academic or demo workflows where the team wants direct ownership of rules and UI.
+- Zyra's pipeline is easier to explain end-to-end because the evaluation logic sits in the project codebase.
+
+
+Software 5: TestGorilla
+Type: Pre-employment assessment platform
+
+Main features
+- 350+ skills tests
+- AI video interviews
+- AI resume scoring
+- Auto-scoring for custom questions and video responses
+- Candidate behavior monitoring / anti-cheating signals
+- ATS integrations
+- API and ATS integrations available on higher plans
+
+Drawbacks
+- TestGorilla is assessment-first, not a full recruitment management platform.
+- It is very strong before the interview stage, but it does not replace a full HR dashboard and ATS workflow by itself.
+- ATS integrations and API access are plan-gated, which can raise cost for deeper operational use.
+
+What Zyra improves compared with TestGorilla
+- Zyra covers more of the complete recruitment journey, not only the pre-screening layer.
+- Zyra connects application, login, testing, coding, interview, and reporting in one continuous experience.
+- Zyra gives HR a role-specific final recommendation inside the same platform rather than pushing the broader workflow into another ATS.
+
+
+Software 6: HackerRank
+Type: Technical screening and live coding interview platform
+
+Main features
+- Take-home coding assessments
+- AI-assisted technical screening
+- Live coding interviews
+- Integrity stack with suspicious activity detection, identity checks, and proctor support
+- Immediate interview reports and ATS sync
+
+Drawbacks
+- HackerRank is highly specialized for technical hiring and software roles.
+- It is not intended to be a broad hiring system for finance, education, hospitality, healthcare, and other non-technical roles.
+- It focuses more on developer skill measurement than on full recruiter dashboard workflow.
+
+What Zyra improves compared with HackerRank
+- Zyra supports both technical and non-technical roles.
+- Zyra includes resume screening, MCQ, interview, and HR report generation for broader recruitment use cases.
+- Zyra can still support technical hiring through its optional coding round without becoming a technical-only product.
+
+
+3. Overall comparison
+
+Important market observation:
+
+Most existing products are strong in one or two layers:
+
+- ATS and workflow management: Workable, Greenhouse, Lever
+- Video interviewing and assessments: HireVue
+- Pre-employment testing: TestGorilla
+- Technical coding evaluation: HackerRank
+
+Zyra's main difference is that it tries to combine all these layers in one unified workflow.
+
+
+4. What Zyra has improved over common market alternatives
+
+The strongest improvements in Zyra are not "bigger enterprise scale." The real improvements are workflow-level improvements:
+
+- Single-flow experience: Zyra links application, screening, testing, interview, and report generation without forcing the user across many disconnected products.
+- Built-in proctoring logic: Zyra includes warning counts, tab-switch handling, multi-face detection flow, recording, and violation-based actions in the assessment journey.
+- Combined evidence model: Zyra does not judge a candidate using only a resume or only a test. It combines resume score, MCQ, coding, interview, and proctoring evidence.
+- HR-only reporting: the final recommendation is kept on the HR side, which is useful for controlled decision support.
+- Role-based progression: technical candidates can be pushed into coding, while other candidates can continue through the regular path.
+- Customization: because Zyra is code-owned, rules such as score thresholds, question counts, and promotion logic can be changed directly.
+- Lower tool fragmentation: many enterprise products rely on a stack of ATS + assessment vendor + interview vendor + reporting tool. Zyra reduces this sprawl.
+- Better fit for academic/demo/startup environments: Zyra is easier to showcase as one complete recruitment prototype instead of a bundle of subscriptions.
+
+
+5. Honest limitations where commercial tools are still stronger
+
+For balance, established products still appear stronger than Zyra in these areas:
+
+- Enterprise integrations and marketplace ecosystem
+- Compliance certifications and vendor trust
+- Global scale and long-term production support
+- Mature analytics, audit, and admin tooling
+- Large validated assessment content libraries
+
+So the best conclusion is:
+
+Zyra improves on workflow unification, customization, and built-in AI screening logic, while established platforms still lead in enterprise maturity, compliance, and ecosystem depth.
+
+
+6. Final conclusion
+
+Yes, there are many software products similar to Zyra, but most of them only match one side of Zyra well.
+
+- Workable, Greenhouse, and Lever are closest on ATS and hiring workflow management.
+- HireVue is closest on video interviewing and structured assessment.
+- TestGorilla is closest on AI-led pre-employment screening.
+- HackerRank is closest on technical coding evaluation.
+
+What makes Zyra different is that it combines ATS-style screening, assessment, coding, proctoring, AI interview, and HR reporting in one system. That is the main improvement over many existing tools: fewer disconnected steps, more control over evaluation logic, and a clearer end-to-end recruitment pipeline.
+
+
+7. Sources used
+
+Official Zyra project sources
+- README.md in this repository
+- Zyra_Project_Report.md in this repository
+
+Official vendor sources
+- Workable features: https://www.workable.com/features
+- Workable premium tools pricing: https://help.workable.com/hc/en-us/articles/11615114447127-Recruiting-premium-tools-pricing-Video-interviews-Texting-and-Assessments
+- Workable video interviews overview: https://help.workable.com/hc/en-us/articles/360042640034-Workable-Video-Interviews-Overview
+
+- Greenhouse main platform: https://www.greenhouse.com/
+- Greenhouse recruiting: https://www.greenhouse.com/recruiting
+- Greenhouse candidate experience: https://www.greenhouse.com/candidate-experience
+- Greenhouse partner directory: https://integrations.greenhouse.com/
+
+- Lever ATS: https://www.lever.co/applicant-tracking-system/
+- Lever TRM: https://www.lever.co/lever-trm/
+- Lever analytics: https://www.lever.co/recruitment-analytics-software/
+
+- HireVue platform: https://www.hirevue.com/platform
+- HireVue home: https://www.hirevue.com/
+- HireVue video interviewing: https://www.hirevue.com/platform/online-video-interviewing-software
+
+- TestGorilla home: https://www.testgorilla.com/
+- TestGorilla assessments: https://www.testgorilla.com/assessments/
+- TestGorilla ATS integrations: https://www.testgorilla.com/ats-integrations/
+- TestGorilla anti-cheating: https://support.testgorilla.com/hc/en-us/articles/9028797639451-Understanding-anti-cheating-measures
+
+- HackerRank technical screening: https://www.hackerrank.com/products/screen
+- HackerRank live interviews: https://www.hackerrank.com/products/interview/
+- HackerRank suspicious activity FAQ: https://www.hackerrank.com/frequently-asked-questions/how-does-interview-detect-and-prevent-suspicious-activity-and-plagiarism
+
+Note:
+Where the word "Inference" appears, the drawback is an analytical conclusion drawn from the product's official scope, plan structure, or integration model rather than a direct self-stated weakness from the vendor.

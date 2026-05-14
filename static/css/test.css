@@ -249,6 +249,129 @@ body.proctor-auto-submitting .speech-block {
 
 .mcq-actions .btn { flex: 1; justify-content: center; }
 
+.submission-popup-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.34);
+  backdrop-filter: blur(10px);
+  animation: submissionFadeIn 0.22s ease both;
+}
+
+.submission-popup {
+  width: min(420px, 100%);
+  padding: 34px 28px 28px;
+  border-radius: 22px;
+  border: 1px solid rgba(200,216,232,0.88);
+  background: rgba(255,255,255,0.96);
+  box-shadow: 0 24px 70px rgba(26,47,78,0.28);
+  text-align: center;
+  animation: submissionPopIn 0.46s cubic-bezier(.2,.9,.24,1.22) both;
+}
+
+.submission-check {
+  width: 76px;
+  height: 76px;
+  margin: 0 auto 18px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #22c55e 0%, #15803d 100%);
+  position: relative;
+  box-shadow: 0 10px 28px rgba(34,197,94,0.34);
+  animation: submissionCheckPulse 0.72s ease 0.12s both;
+}
+
+.submission-check::after {
+  content: "";
+  position: absolute;
+  left: 25px;
+  top: 19px;
+  width: 18px;
+  height: 32px;
+  border: solid white;
+  border-width: 0 5px 5px 0;
+  transform: rotate(45deg) scale(0);
+  animation: submissionTick 0.34s ease 0.32s forwards;
+}
+
+.submission-popup h2 {
+  margin: 0 0 10px;
+  color: var(--navy-dark);
+  font-family: var(--font-head);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.submission-popup p {
+  margin: 0;
+  color: var(--text-mid);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.submission-popup strong {
+  display: inline-flex;
+  margin-top: 16px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  color: #166534;
+  background: rgba(34,197,94,0.12);
+  border: 1px solid rgba(34,197,94,0.2);
+  font-family: var(--font-head);
+  font-size: 13px;
+}
+
+.submission-popup-btn {
+  margin-top: 22px;
+  width: 100%;
+  min-height: 44px;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--navy-mid) 0%, var(--navy-dark) 100%);
+  color: white;
+  font-family: var(--font-head);
+  font-size: 14px;
+  font-weight: 800;
+  box-shadow: 0 10px 24px rgba(26,47,78,0.22);
+  transition: var(--transition);
+}
+
+.submission-popup-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 30px rgba(26,47,78,0.28);
+}
+
+@keyframes submissionFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes submissionPopIn {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes submissionCheckPulse {
+  0% { transform: scale(0.72); opacity: 0; }
+  70% { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes submissionTick {
+  from { transform: rotate(45deg) scale(0); }
+  to { transform: rotate(45deg) scale(1); }
+}
+
 /* ============ AI AVATAR DASHBOARD ============ */
 .avatar-page-shell {
   width: min(1168px, calc(100% - 48px));

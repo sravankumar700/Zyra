@@ -480,6 +480,33 @@ textarea.field-input { resize: vertical; min-height: 100px; line-height: 1.6; }
 .checkbox-label { font-size: 13px; color: var(--text-mid); line-height: 1.5; }
 .checkbox-label a { color: var(--blue); text-decoration: none; font-weight: 500; }
 
+.terms-panel {
+  margin-bottom: 18px;
+  padding: 16px 18px;
+  border: 1px solid rgba(37,99,168,0.18);
+  border-radius: 12px;
+  background: rgba(37,99,168,0.06);
+}
+
+.terms-title {
+  margin-bottom: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--navy-dark);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.terms-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-mid);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.terms-list li + li { margin-top: 7px; }
+
 /* Form footer */
 .form-footer {
   display: flex; align-items: center; justify-content: space-between;

@@ -136,11 +136,14 @@ users = db.users
 tests = db.tests
 coding_tests = db.coding_tests
 jobs = db.jobs
-MCQ_QUESTION_COUNT = max(20, int(os.getenv("MCQ_QUESTION_COUNT", "20")))
+MCQ_QUESTION_COUNT = max(30, int(os.getenv("MCQ_QUESTION_COUNT", "30")))
+APTITUDE_QUESTION_COUNT = max(30, int(os.getenv("APTITUDE_QUESTION_COUNT", "30")))
 VIRTUAL_QUESTION_COUNT = min(20, max(15, int(os.getenv("VIRTUAL_QUESTION_COUNT", "18"))))
 MCQ_PROMOTION_THRESHOLD_PERCENT = float(os.getenv("MCQ_PROMOTION_THRESHOLD_PERCENT", "60"))
+APTITUDE_PROMOTION_THRESHOLD_PERCENT = float(os.getenv("APTITUDE_PROMOTION_THRESHOLD_PERCENT", "60"))
 RESUME_AUTO_CREDENTIAL_THRESHOLD_PERCENT = float(os.getenv("RESUME_AUTO_CREDENTIAL_THRESHOLD_PERCENT", "60"))
 MCQ_TEST_DURATION_SECONDS = max(300, int(os.getenv("MCQ_TEST_DURATION_SECONDS", "1800")))
+APTITUDE_TEST_DURATION_SECONDS = max(300, int(os.getenv("APTITUDE_TEST_DURATION_SECONDS", "1200")))
 VIRTUAL_TEST_DURATION_SECONDS = max(300, int(os.getenv("VIRTUAL_TEST_DURATION_SECONDS", "2700")))
 
 
@@ -242,6 +245,13 @@ def public_candidate_document(user, include_report=False):
         "mcq_total_questions": user.get("mcq_total_questions"),
         "mcq_completed_at": user.get("mcq_completed_at"),
         "mcq_proctoring_violations": user.get("mcq_proctoring_violations"),
+        "aptitude_round_enabled": user.get("aptitude_round_enabled"),
+        "aptitude_taken": user.get("aptitude_taken"),
+        "aptitude_score_percent": user.get("aptitude_score_percent"),
+        "aptitude_raw_score": user.get("aptitude_raw_score"),
+        "aptitude_total_questions": user.get("aptitude_total_questions"),
+        "aptitude_completed_at": user.get("aptitude_completed_at"),
+        "aptitude_proctoring_violations": user.get("aptitude_proctoring_violations"),
         "coding_taken": user.get("coding_taken"),
         "coding_score": user.get("coding_score"),
         "coding_feedback": user.get("coding_feedback"),
@@ -265,6 +275,10 @@ def public_candidate_document(user, include_report=False):
         document["virtual_answers"] = user.get("virtual_answers", [])
         document["questions_data"] = user.get("questions_data", [])
         document["candidate_answers"] = user.get("candidate_answers", [])
+        document["aptitude_questions"] = user.get("aptitude_questions", [])
+        document["aptitude_answers"] = user.get("aptitude_answers", [])
+        document["credential_username"] = user.get("credential_username") or user.get("username")
+        document["credential_plaintext"] = user.get("credential_plaintext")
     return serialize_admin_value(document)
 
 PROFESSION_CATEGORIES = {
@@ -1062,6 +1076,19 @@ def create_candidate_account_from_application(app_data):
         "interview_recommendation": None,
         "candidate_report": None,
         "mcq_completed_at": None,
+        "aptitude_round_enabled": False,
+        "aptitude_taken": False,
+        "aptitude_score": None,
+        "aptitude_score_percent": None,
+        "aptitude_raw_score": None,
+        "aptitude_total_questions": None,
+        "aptitude_duration_seconds": None,
+        "aptitude_time_expired": False,
+        "aptitude_auto_submitted": False,
+        "aptitude_proctoring_violations": 0,
+        "aptitude_answers": [],
+        "aptitude_questions": [],
+        "aptitude_completed_at": None,
         "updated_at": utc_now()
     }
     user_document["candidate_report"] = build_candidate_report(user_document)
@@ -1143,6 +1170,19 @@ def reset_demo_candidate_workflow(user_id):
         "candidate_answers": [],
         "questions_data": [],
         "mcq_completed_at": None,
+        "aptitude_round_enabled": False,
+        "aptitude_taken": False,
+        "aptitude_score": None,
+        "aptitude_score_percent": None,
+        "aptitude_raw_score": None,
+        "aptitude_total_questions": None,
+        "aptitude_duration_seconds": None,
+        "aptitude_time_expired": False,
+        "aptitude_auto_submitted": False,
+        "aptitude_proctoring_violations": 0,
+        "aptitude_answers": [],
+        "aptitude_questions": [],
+        "aptitude_completed_at": None,
         "coding_round_enabled": False,
         "coding_taken": False,
         "coding_score": None,
@@ -1277,6 +1317,19 @@ def ensure_demo_candidate():
             "missing_keywords": ["production monitoring"]
         },
         "ats_shortlist_reason": "demo_seed_shortlisted",
+        "aptitude_round_enabled": False,
+        "aptitude_taken": False,
+        "aptitude_score": None,
+        "aptitude_score_percent": None,
+        "aptitude_raw_score": None,
+        "aptitude_total_questions": None,
+        "aptitude_duration_seconds": None,
+        "aptitude_time_expired": False,
+        "aptitude_auto_submitted": False,
+        "aptitude_proctoring_violations": 0,
+        "aptitude_answers": [],
+        "aptitude_questions": [],
+        "aptitude_completed_at": None,
         "virtual_round_enabled": False,
         "virtual_taken": False,
         "virtual_score": None,
@@ -1324,6 +1377,25 @@ def ensure_demo_candidate():
                 "ats_decision": demo_document["ats_decision"],
                 "ats_summary": demo_document["ats_summary"],
                 "ats_breakdown": demo_document["ats_breakdown"],
+                "aptitude_round_enabled": False,
+                "aptitude_taken": False,
+                "aptitude_score": None,
+                "aptitude_score_percent": None,
+                "aptitude_raw_score": None,
+                "aptitude_total_questions": None,
+                "aptitude_duration_seconds": None,
+                "aptitude_time_expired": False,
+                "aptitude_auto_submitted": False,
+                "aptitude_proctoring_violations": 0,
+                "aptitude_answers": [],
+                "aptitude_questions": [],
+                "aptitude_completed_at": None,
+                "virtual_round_enabled": False,
+                "virtual_taken": False,
+                "virtual_score": None,
+                "virtual_questions": [],
+                "virtual_answers": [],
+                "virtual_decision": "pending",
                 "coding_round_enabled": False,
                 "coding_taken": False,
                 "coding_score": None,
@@ -1744,25 +1816,25 @@ def generate_deterministic_virtual_questions(user, total_count):
     category_key = infer_profession_category(role, skills_raw)
     templates_by_category = {
         "technology_it": [
-            "Tell me about a recent project where you used {skill}. What was your exact contribution?",
-            "You are assigned a high-priority issue in a {role} workflow. How would you investigate and resolve it?",
-            "Describe a time when you had conflicting technical requirements. How did you handle it?",
-            "How do you ensure quality before releasing work in a {role} team?",
-            "Explain a performance or reliability issue you solved using {skill}."
+            "Let's start with your recent work. Can you walk me through a project where you used {skill}, and explain the part you personally owned?",
+            "Imagine a high-priority issue appears in a {role} workflow. Talk me through how you would investigate it, who you would involve, and what you would do first.",
+            "Tell me about a time when two technical requirements conflicted. What trade-off did you choose, and why?",
+            "When you are close to release, how do you convince yourself the work is actually ready? Please share your usual checks.",
+            "Think of a performance or reliability problem you solved using {skill}. What made it difficult, and what did you learn?"
         ],
         "healthcare_medical": [
-            "Tell me about a situation where you handled a sensitive patient-care responsibility. What did you do?",
-            "Describe a time when a patient condition changed unexpectedly. How did you respond?",
-            "How do you maintain accuracy in documentation and handovers during busy shifts?",
-            "Share an example of working with a multidisciplinary team to improve care outcomes.",
-            "What steps do you take to stay calm and safe under clinical pressure?"
+            "Let's talk about patient responsibility. Can you describe a sensitive care situation and how you handled it?",
+            "If a patient's condition changes unexpectedly during a busy shift, what would you do in the first few minutes?",
+            "How do you keep documentation and handovers accurate when there is pressure and limited time?",
+            "Tell me about a moment where teamwork changed the outcome for a patient. What was your role?",
+            "When clinical pressure rises, what do you do to stay calm, safe, and clear in your decisions?"
         ],
         "engineering_technical": [
-            "Tell me about a technical problem you solved in a recent {role} assignment.",
-            "Describe a time you identified the root cause of a recurring equipment or process issue.",
-            "How do you balance safety, quality, and delivery deadlines in your work?",
-            "Share an example of using {skill} to improve efficiency or reduce failures.",
-            "How do you communicate technical constraints to operations or management?"
+            "Walk me through a technical problem you solved recently in a {role} assignment. What was the first clue?",
+            "Tell me about a recurring equipment or process issue you traced to the root cause. How did you prove it?",
+            "When safety, quality, and deadline pressure compete, how do you decide what gets priority?",
+            "Can you share a practical example where {skill} helped you reduce failures or improve efficiency?",
+            "How do you explain technical constraints to operations or management without losing the important details?"
         ],
         "education_research": [
             "Tell me about a lesson, training session, or research task that had a strong outcome.",
@@ -1830,15 +1902,17 @@ def generate_deterministic_virtual_questions(user, total_count):
     }
     templates = templates_by_category.get(category_key, templates_by_category["business_management"])
 
-    questions = []
+    questions = [
+        f"Before we get technical, tell me about yourself as a {role}. What kind of work brings out your best performance?",
+        f"What is one professional challenge you handled recently, and what would you do differently if you faced it again?",
+        f"If I asked your last team what you are reliable for, what would they say? Please give me a real example."
+    ]
     idx = 0
     while len(questions) < total_count:
         t = templates[idx % len(templates)]
-        questions.append(
-            t.format(skill=primary_skill, role=role) + f" (Round Question {len(questions) + 1})"
-        )
+        questions.append(t.format(skill=primary_skill, role=role))
         idx += 1
-    return questions
+    return [f"{question} (Conversation Question {idx + 1})" for idx, question in enumerate(questions[:total_count])]
 
 
 def generate_mcq_questions_with_fallback(user, total_count, session_seed=None, excluded_questions=None):
@@ -1953,6 +2027,188 @@ Also avoid wording or scenarios similar to these recently used questions across 
             "answer": q["answer"]
         })
     return final_questions, None
+
+
+def generate_deterministic_aptitude_questions(total_count, session_seed=None, excluded_questions=None):
+    excluded = {
+        re.sub(r"\s+", " ", str(item).strip()).lower()
+        for item in (excluded_questions or [])
+        if str(item).strip()
+    }
+    rng = random.Random(str(session_seed or uuid.uuid4().hex))
+    templates = [
+        {"category": "Quantitative Aptitude", "question": "A train covers 180 km in 3 hours. If its speed increases by 20 km/h, how long will it take to cover 240 km?", "options": ["2.5 hours", "3 hours", "3.5 hours", "4 hours"], "answer": 1},
+        {"category": "Quantitative Aptitude", "question": "The average of five numbers is 28. If one number, 36, is removed, what is the average of the remaining four numbers?", "options": ["24", "25", "26", "27"], "answer": 2},
+        {"category": "Quantitative Aptitude", "question": "A product marked at Rs. 800 is sold after a 15% discount. What is the selling price?", "options": ["Rs. 640", "Rs. 660", "Rs. 680", "Rs. 700"], "answer": 2},
+        {"category": "Quantitative Aptitude", "question": "A sum doubles in 8 years at simple interest. What is the annual rate of interest?", "options": ["10%", "12.5%", "15%", "20%"], "answer": 1},
+        {"category": "Quantitative Aptitude", "question": "The ratio of boys to girls is 3:2. If there are 45 boys, how many girls are there?", "options": ["20", "25", "30", "35"], "answer": 2},
+        {"category": "Quantitative Aptitude", "question": "A worker can finish a task in 12 days. Another worker can finish it in 6 days. Working together, how long will they take?", "options": ["3 days", "4 days", "5 days", "6 days"], "answer": 1},
+        {"category": "Logical Reasoning", "question": "Find the next number in the series: 3, 7, 15, 31, 63, ?", "options": ["95", "111", "127", "131"], "answer": 2},
+        {"category": "Logical Reasoning", "question": "If all Bloops are Razzies and all Razzies are Lazzies, which statement must be true?", "options": ["All Lazzies are Bloops", "All Bloops are Lazzies", "No Bloops are Lazzies", "Some Razzies are not Bloops"], "answer": 1},
+        {"category": "Logical Reasoning", "question": "In a code, TABLE is written as UBCMF. How is CHAIR written in the same code?", "options": ["DIBJS", "DGZHQ", "BGPJQ", "EJCKT"], "answer": 0},
+        {"category": "Logical Reasoning", "question": "Pointing to a woman, Ravi says, 'She is the daughter of my mother's only son.' How is the woman related to Ravi?", "options": ["Sister", "Daughter", "Mother", "Cousin"], "answer": 1},
+        {"category": "Logical Reasoning", "question": "Arrange the words in a logical order: Interview, Apply, Offer, Shortlist, Join.", "options": ["Apply, Shortlist, Interview, Offer, Join", "Shortlist, Apply, Interview, Join, Offer", "Apply, Interview, Shortlist, Join, Offer", "Join, Offer, Interview, Shortlist, Apply"], "answer": 0},
+        {"category": "Verbal Ability", "question": "Choose the word closest in meaning to 'meticulous'.", "options": ["Careless", "Detailed", "Rapid", "Ordinary"], "answer": 1},
+        {"category": "Verbal Ability", "question": "Choose the correct sentence.", "options": ["Each of the players are ready.", "Each of the players is ready.", "Each players is ready.", "Each player are ready."], "answer": 1},
+        {"category": "Verbal Ability", "question": "Select the best antonym for 'scarce'.", "options": ["Rare", "Limited", "Abundant", "Hidden"], "answer": 2},
+        {"category": "Verbal Ability", "question": "Fill in the blank: The manager insisted that the report _____ submitted before noon.", "options": ["is", "be", "was", "has"], "answer": 1},
+        {"category": "Data Interpretation", "question": "A team completed 45 tasks on Monday and 60 tasks on Tuesday. What is the percentage increase?", "options": ["25%", "30%", "33.33%", "40%"], "answer": 2},
+        {"category": "Data Interpretation", "question": "If 40% of a class of 50 students are girls, how many boys are in the class?", "options": ["20", "25", "30", "35"], "answer": 2},
+        {"category": "Data Interpretation", "question": "If sales rise from 250 units to 325 units, what is the percentage growth?", "options": ["20%", "25%", "30%", "35%"], "answer": 2},
+        {"category": "Quantitative Aptitude", "question": "A shopkeeper buys an item for Rs. 500 and sells it for Rs. 625. What is the profit percentage?", "options": ["20%", "25%", "30%", "35%"], "answer": 1},
+        {"category": "Quantitative Aptitude", "question": "What is 18% of 450?", "options": ["72", "78", "81", "90"], "answer": 2},
+        {"category": "Quantitative Aptitude", "question": "The perimeter of a square is 64 cm. What is its area?", "options": ["128 sq cm", "196 sq cm", "224 sq cm", "256 sq cm"], "answer": 3},
+        {"category": "Quantitative Aptitude", "question": "A number is increased by 25% and becomes 100. What was the original number?", "options": ["70", "75", "80", "85"], "answer": 2},
+        {"category": "Logical Reasoning", "question": "Find the odd one out: Apple, Mango, Carrot, Banana.", "options": ["Apple", "Mango", "Carrot", "Banana"], "answer": 2},
+        {"category": "Logical Reasoning", "question": "If NORTH is coded as OPSUI, how is SOUTH coded?", "options": ["TPVUI", "RNTGS", "UQWVK", "TPWUI"], "answer": 0},
+        {"category": "Logical Reasoning", "question": "Complete the analogy: Book is to Reading as Fork is to _____.", "options": ["Drawing", "Eating", "Writing", "Sleeping"], "answer": 1},
+        {"category": "Logical Reasoning", "question": "If A is taller than B, B is taller than C, and C is taller than D, who is the shortest?", "options": ["A", "B", "C", "D"], "answer": 3},
+        {"category": "Verbal Ability", "question": "Choose the correctly spelled word.", "options": ["Accomodate", "Acommodate", "Accommodate", "Acomodate"], "answer": 2},
+        {"category": "Verbal Ability", "question": "Choose the best synonym for 'brief'.", "options": ["Short", "Heavy", "Bright", "Late"], "answer": 0},
+        {"category": "Verbal Ability", "question": "Fill in the blank: Neither the manager nor the employees _____ available yesterday.", "options": ["was", "were", "is", "has"], "answer": 1},
+        {"category": "Data Interpretation", "question": "A chart shows expenses of Rs. 12,000 and income of Rs. 20,000. What percentage of income is spent?", "options": ["50%", "55%", "60%", "65%"], "answer": 2},
+        {"category": "Data Interpretation", "question": "A company had 80 employees last year and 100 this year. What is the percentage increase?", "options": ["20%", "25%", "30%", "35%"], "answer": 1},
+        {"category": "Data Interpretation", "question": "If 3 out of 12 projects are delayed, what percentage of projects are delayed?", "options": ["20%", "25%", "30%", "33.33%"], "answer": 1},
+        {"category": "Data Interpretation", "question": "A test has 60 questions. A candidate answers 45 correctly. What is the accuracy percentage?", "options": ["70%", "72%", "75%", "80%"], "answer": 2}
+    ]
+    hard_templates = [
+        {"category": "Advanced Quantitative Aptitude", "question": "A and B can complete a project in 18 days, B and C in 24 days, and A and C in 36 days. How many days will A, B, and C take together?", "options": ["14.4 days", "16 days", "18 days", "20 days"], "answer": 0},
+        {"category": "Advanced Quantitative Aptitude", "question": "A container has milk and water in the ratio 7:3. If 20 litres of mixture is removed and replaced with water, the ratio becomes 7:5. What was the original quantity?", "options": ["70 litres", "80 litres", "90 litres", "100 litres"], "answer": 1},
+        {"category": "Advanced Quantitative Aptitude", "question": "A sum amounts to Rs. 14,400 in 2 years and Rs. 17,280 in 3 years at compound interest. What is the annual interest rate?", "options": ["15%", "18%", "20%", "22%"], "answer": 2},
+        {"category": "Advanced Quantitative Aptitude", "question": "Two numbers are in the ratio 5:7. If their LCM is 420, what is their HCF?", "options": ["10", "12", "15", "20"], "answer": 1},
+        {"category": "Advanced Quantitative Aptitude", "question": "A boat takes 6 hours downstream and 9 hours upstream for the same distance. If the stream speed is 3 km/h, what is the boat speed in still water?", "options": ["12 km/h", "15 km/h", "18 km/h", "21 km/h"], "answer": 1},
+        {"category": "Advanced Quantitative Aptitude", "question": "The marked price of an item is 40% above cost. After two successive discounts of 10% and 15%, what is the profit percentage?", "options": ["5.5%", "7.1%", "8%", "10%"], "answer": 1},
+        {"category": "Advanced Quantitative Aptitude", "question": "A man spends 65% of his salary and saves Rs. 14,000. If his salary increases by 20% and spending increases by 10%, what is his new saving?", "options": ["Rs. 18,200", "Rs. 19,600", "Rs. 21,000", "Rs. 22,400"], "answer": 3},
+        {"category": "Advanced Quantitative Aptitude", "question": "In how many ways can 5 people be seated in a row if two particular people must not sit together?", "options": ["48", "60", "72", "96"], "answer": 2},
+        {"category": "Advanced Logical Reasoning", "question": "Five people A, B, C, D, and E sit in a row. A is left of B, C is right of D, E is between A and C, and B is not at an end. Who can be in the middle?", "options": ["A", "B", "C", "E"], "answer": 3},
+        {"category": "Advanced Logical Reasoning", "question": "If 'TRAIN' is coded as 'UQBHO' by alternating +1 and -1 alphabet shifts, how is 'PLANE' coded?", "options": ["QKBMF", "OKZMF", "QKZMF", "QMBOF"], "answer": 0},
+        {"category": "Advanced Logical Reasoning", "question": "Statements: Some analysts are managers. All managers are leaders. No leader is careless. Which conclusion follows?", "options": ["Some analysts are not careless", "All analysts are leaders", "No analyst is careless", "Some careless people are managers"], "answer": 0},
+        {"category": "Advanced Logical Reasoning", "question": "Find the missing term: 4, 9, 19, 39, 79, ?", "options": ["119", "139", "159", "169"], "answer": 2},
+        {"category": "Advanced Logical Reasoning", "question": "A clock shows 3:20. What is the smaller angle between the hour and minute hands?", "options": ["10 degrees", "20 degrees", "30 degrees", "40 degrees"], "answer": 1},
+        {"category": "Advanced Logical Reasoning", "question": "If only one of these statements is true, which statement is true? A says B is lying. B says C is lying. C says A and B are lying.", "options": ["A only", "B only", "C only", "None"], "answer": 1},
+        {"category": "Advanced Logical Reasoning", "question": "In a family, P is Q's brother, R is Q's mother, S is R's father, and T is S's wife. How is T related to P?", "options": ["Mother", "Grandmother", "Aunt", "Sister"], "answer": 1},
+        {"category": "Advanced Verbal Ability", "question": "Choose the sentence with the clearest and most correct meaning.", "options": ["Having reviewed the data, the decision was changed by the team.", "The team changed the decision after reviewing the data.", "After reviewing, the data changed the team's decision.", "The decision, after the team, reviewed the data changed."], "answer": 1},
+        {"category": "Advanced Verbal Ability", "question": "Choose the word that best completes the sentence: The evidence was not merely supportive; it was ____ to the final decision.", "options": ["peripheral", "incidental", "decisive", "ornamental"], "answer": 2},
+        {"category": "Advanced Verbal Ability", "question": "Identify the option closest in meaning to 'equivocal'.", "options": ["Clear", "Ambiguous", "Forceful", "Permanent"], "answer": 1},
+        {"category": "Advanced Verbal Ability", "question": "Choose the grammatically correct sentence.", "options": ["The data indicates a trend, but the results is preliminary.", "The data indicate a trend, but the results are preliminary.", "The data indicates a trend, but the results are preliminary.", "The data indicate a trend, but the result are preliminary."], "answer": 1},
+        {"category": "Advanced Verbal Ability", "question": "Select the sentence that avoids redundancy.", "options": ["We need to plan ahead in advance.", "The final outcome was unexpected.", "Please revert back soon.", "We need a plan before launch."], "answer": 3},
+        {"category": "Advanced Data Interpretation", "question": "Revenue rose from Rs. 8 lakh to Rs. 10 lakh while costs rose from Rs. 5 lakh to Rs. 7 lakh. What happened to profit?", "options": ["Increased by Rs. 1 lakh", "Decreased by Rs. 1 lakh", "Stayed the same", "Decreased by Rs. 2 lakh"], "answer": 2},
+        {"category": "Advanced Data Interpretation", "question": "A team's output was 120, 150, 180, and 210 units over four weeks. If the trend continues, what is the expected output in week five?", "options": ["225", "230", "240", "250"], "answer": 2},
+        {"category": "Advanced Data Interpretation", "question": "A product has 60% market share in a 50,000-unit market. If the market grows by 20% and share falls to 55%, how many units are sold?", "options": ["30,000", "31,500", "33,000", "36,000"], "answer": 2},
+        {"category": "Advanced Data Interpretation", "question": "In a survey, 70% liked product A, 60% liked product B, and 45% liked both. What percentage liked at least one of them?", "options": ["75%", "80%", "85%", "90%"], "answer": 2},
+        {"category": "Advanced Data Interpretation", "question": "A candidate scores 72, 84, 90, and 78 in four sections with weights 20%, 30%, 30%, and 20%. What is the weighted score?", "options": ["80.4", "81.6", "82.2", "83.0"], "answer": 1},
+        {"category": "Advanced Data Interpretation", "question": "Defects dropped from 48 to 30 while production rose from 1,200 to 1,500 units. What happened to defect rate?", "options": ["Dropped from 4% to 2%", "Dropped from 4% to 2.5%", "Dropped from 5% to 2%", "Stayed at 4%"], "answer": 0},
+        {"category": "Advanced Quantitative Aptitude", "question": "A rectangle's length is increased by 20% and width decreased by 10%. What is the percentage change in area?", "options": ["8% increase", "10% increase", "12% increase", "2% decrease"], "answer": 0},
+        {"category": "Advanced Logical Reasoning", "question": "If Monday is coded as 1 and each following day adds the square of its position number, what is Friday's code?", "options": ["30", "45", "55", "60"], "answer": 2},
+        {"category": "Advanced Verbal Ability", "question": "Choose the best inference: 'The policy reduced complaints, but only after managers received training.'", "options": ["The policy alone was sufficient", "Training likely affected implementation", "Complaints were unrelated to managers", "The policy increased complaints first"], "answer": 1},
+        {"category": "Advanced Data Interpretation", "question": "If 35% of applicants pass round one and 40% of those pass round two, what percentage of original applicants pass both?", "options": ["12%", "14%", "16%", "18%"], "answer": 1}
+    ]
+    templates = hard_templates + templates
+
+    generated = []
+    idx = 0
+    while len(generated) < total_count:
+        item = templates[idx % len(templates)]
+        question_text = item["question"]
+        if idx >= len(templates):
+            question_text = f"{question_text} (Variant {idx // len(templates) + 1})"
+        idx += 1
+        key = re.sub(r"\s+", " ", question_text).strip().lower()
+        if key in excluded:
+            continue
+
+        correct_text = item["options"][item["answer"]]
+        options = list(item["options"])
+        rng.shuffle(options)
+        generated.append({
+            "id": len(generated) + 1,
+            "category": item["category"],
+            "question": question_text,
+            "options": options,
+            "answer": options.index(correct_text)
+        })
+        excluded.add(key)
+    return generated
+
+
+def generate_aptitude_questions_with_fallback(user, total_count, session_seed=None, excluded_questions=None):
+    excluded_questions = [re.sub(r"\s+", " ", str(item).strip()).lower() for item in (excluded_questions or []) if str(item).strip()]
+    variation_hint = str(session_seed or uuid.uuid4().hex[:8])
+    base_prompt = f"""
+Generate a balanced aptitude assessment for candidate screening.
+
+Candidate profile:
+- Job role: {user.get('job_role')}
+- Skills: {user.get('skills')}
+- Variation seed: {variation_hint}
+
+Question mix must include quantitative aptitude, logical reasoning, verbal ability, and data interpretation.
+Difficulty must be moderate-to-hard or hard, suitable for filtering weaker candidates.
+Prefer multi-step calculation, layered reasoning, careful reading, and realistic data interpretation.
+Avoid easy one-step questions unless they include a trap or require careful comparison.
+Each question must be aptitude-focused, not job interview theory.
+Each question must have exactly 4 options, one correct answer index from 0 to 3, and no external-reference dependency.
+"""
+    collected = []
+    seen = set()
+    last_error = None
+    attempts = 0
+    max_attempts = max(8, total_count)
+
+    while len(collected) < total_count and attempts < max_attempts:
+        attempts += 1
+        remaining = total_count - len(collected)
+        batch_size = min(6, remaining)
+        recent_questions = "\n".join([f"- {q['question']}" for q in collected[-10:]]) or "- None yet"
+        external_exclusions = "\n".join([f"- {q}" for q in excluded_questions[:30]]) or "- None recorded"
+        prompt = f"""
+{base_prompt}
+
+Generate exactly {batch_size} fresh questions in this batch.
+Do not repeat or paraphrase these questions from this assessment:
+{recent_questions}
+Also avoid wording similar to recently used questions:
+{external_exclusions}
+"""
+        questions_data, last_error = generate_mcq_with_groq(prompt, batch_size)
+        if not questions_data or not questions_data.get("questions"):
+            continue
+
+        prepared = ensure_mcq_question_quality(questions_data["questions"], user)
+        for item in prepared:
+            dedupe_key = re.sub(r"\s+", " ", item["question"]).strip().lower()
+            if dedupe_key in seen or dedupe_key in excluded_questions:
+                continue
+            seen.add(dedupe_key)
+            collected.append(item)
+            if len(collected) >= total_count:
+                break
+
+    if len(collected) < total_count:
+        deterministic = generate_deterministic_aptitude_questions(
+            total_count - len(collected),
+            session_seed=session_seed,
+            excluded_questions=excluded_questions + list(seen)
+        )
+        for item in deterministic:
+            dedupe_key = re.sub(r"\s+", " ", item["question"]).strip().lower()
+            if dedupe_key in seen or dedupe_key in excluded_questions:
+                continue
+            seen.add(dedupe_key)
+            collected.append(item)
+            if len(collected) >= total_count:
+                break
+
+    final_questions = []
+    for idx, item in enumerate(collected[:total_count], start=1):
+        final_questions.append({
+            "id": idx,
+            "category": item.get("category", "Aptitude"),
+            "question": item["question"],
+            "options": item["options"],
+            "answer": item["answer"]
+        })
+    return final_questions, last_error
 
 
 def query_ollama(prompt_text, model_name=None):
@@ -2152,14 +2408,17 @@ def generate_virtual_questions_with_fallback(user, total_count, excluded_questio
     role_count = max(0, total_count - 3)
     exclusion_text = "\n".join([f"- {item}" for item in excluded_questions[:40]]) or "- None"
     prompt = f"""
-Generate exactly {total_count} high-quality virtual interview questions for this candidate.
+Generate exactly {total_count} high-quality conversational virtual interview questions for this candidate.
 Candidate skills: {user.get('skills')}
 Candidate role: {user.get('job_role')}
 
 Question quality rules:
+- Write like a live HR interviewer speaking naturally to the candidate, not like an exam paper.
+- Use warm, conversational wording such as "walk me through", "tell me about", "how would you handle", or "what did you learn".
 - The first 3 questions must be about personal professional life: background, strengths, work style, career goals, or a meaningful professional challenge.
 - The remaining {role_count} questions must be role-based for the candidate's job role and skills.
-- Include practical, scenario-based and behavioral questions.
+- Include practical, scenario-based and behavioral questions that invite story-based answers.
+- Each question should include a small follow-up angle inside the same question, such as asking for the candidate's role, reasoning, trade-off, or outcome.
 - Test depth, communication, and problem-solving.
 - Avoid duplicate, generic, or commonly repeated interview questions.
 - Do not repeat or closely paraphrase any question from any earlier stage or candidate history.
@@ -2568,6 +2827,57 @@ Return ONLY valid JSON:
     return f"For {role}, explain a fresh example of ownership, decision making, and measurable impact using {skill}."
 
 
+def generate_initial_virtual_question(user, excluded_questions=None):
+    role = str(user.get("job_role") or "this role").strip() or "this role"
+    skills = str(user.get("skills") or "the required skills").strip() or "the required skills"
+    excluded_questions = [str(item or "").strip() for item in (excluded_questions or []) if str(item or "").strip()]
+    used_question_text = "\n".join([f"- {item}" for item in excluded_questions[:35]]) or "- None"
+    prompt = f"""
+Create the first question for a conversational AI virtual interview.
+
+Role: {role}
+Skills: {skills}
+
+Instructions:
+- Ask exactly one warm opening question
+- It should invite the candidate to speak about their background, strengths, work style, or a meaningful professional challenge
+- Keep it conversational, like a live interviewer
+- Do not ask multiple questions
+- Do not repeat or closely paraphrase these used questions:
+{used_question_text}
+
+Return ONLY valid JSON:
+{{ "question": "..." }}
+"""
+    providers = ["groq", "ollama"] if Config.MCQ_USE_OLLAMA else ["groq"]
+    for provider in providers:
+        if provider == "groq":
+            content, _ = query_groq_text(
+                prompt,
+                system_message="You generate one conversational interview question in valid JSON.",
+                model_name=Config.GROQ_TEXT_MODEL,
+                max_tokens=220,
+                temperature=0.4
+            )
+        else:
+            content, _ = query_ollama(prompt, model_name=Config.OLLAMA_MODEL)
+        if not content:
+            continue
+        parsed = extract_json_block(content)
+        candidate_question = ""
+        if isinstance(parsed, dict):
+            candidate_question = str(parsed.get("question", "")).strip()
+        if not candidate_question:
+            lines = [line.strip("-* \t") for line in str(content).splitlines() if line.strip()]
+            candidate_question = lines[0] if lines else ""
+        normalized = re.sub(r"\s+", " ", candidate_question).strip()
+        if normalized and not is_similar_question(normalized, excluded_questions):
+            return normalized, {"source": provider}
+
+    fallback = generate_deterministic_virtual_questions(user, 1)[0]
+    return fallback, {"source": "deterministic"}
+
+
 def normalize_coding_questions(raw_questions):
     normalized = []
     if not isinstance(raw_questions, list):
@@ -2873,6 +3183,7 @@ FRONTEND_PAGES = {
     "hr_login",
     "admin_dashboard",
     "mcq_test",
+    "aptitude_assessment",
     "avatar_interview",
     "report",
 }
@@ -2898,7 +3209,7 @@ def frontend_page(page_name):
         return redirect("/admin/login")
     if page_name == "report":
         return redirect("/admin/dashboard" if session.get("admin") else "/admin/login")
-    if page_name in {"user_dashboard", "mcq_test", "avatar_interview"}:
+    if page_name in {"user_dashboard", "mcq_test", "aptitude_assessment", "avatar_interview"}:
         if not session.get("candidate_id"):
             return redirect("/candidate/login")
         if not mongo_is_available():
@@ -2909,8 +3220,14 @@ def frontend_page(page_name):
             return redirect("/candidate/login")
         if page_name == "mcq_test" and user.get("interview_taken"):
             return redirect("/user_dashboard.html")
-        if page_name == "avatar_interview" and (
+        if page_name == "aptitude_assessment" and (
             not user.get("interview_taken")
+            or not user.get("aptitude_round_enabled")
+            or user.get("aptitude_taken")
+        ):
+            return redirect("/user_dashboard.html")
+        if page_name == "avatar_interview" and (
+            not user.get("aptitude_taken")
             or not user.get("virtual_round_enabled")
             or user.get("virtual_taken")
         ):
@@ -2959,7 +3276,7 @@ def candidate_interview_v2():
         return redirect("/")
     if user.get("status") == "rejected":
         return redirect("/")
-    if not user.get("interview_taken"):
+    if not user.get("interview_taken") or not user.get("aptitude_taken"):
         return redirect("/")
     if user.get("virtual_taken"):
         return redirect("/")
@@ -3298,9 +3615,8 @@ def get_applications():
             public_candidate_document(user_doc, include_report=True)
             for user_doc in users.find({
                 "interview_taken": True,
-                "virtual_taken": True,
                 "demo_user": {"$ne": True}
-            }).sort("virtual_completed_at", -1)
+            }).sort("updated_at", -1)
         ]
     except (ServerSelectionTimeoutError, PyMongoError) as e:
         return jsonify({
@@ -3470,8 +3786,6 @@ def promote_virtual(id):
 
     if not user.get("interview_taken"):
         return jsonify({"error": "Candidate has not completed MCQ interview yet"}), 400
-    assessment_track = user.get("assessment_track", resolve_assessment_track(user.get("job_role"), user.get("skills"), user))
-    enable_coding = assessment_track == "technical" and not user.get("coding_taken")
     update_fields = {
         "status": "selected",
         "credential_login_count": 0,
@@ -3479,17 +3793,21 @@ def promote_virtual(id):
         "bias_review_required": False,
         "updated_at": utc_now()
     }
-    if enable_coding:
+    if not user.get("aptitude_taken"):
         update_fields.update({
-            "coding_round_enabled": True,
+            "aptitude_round_enabled": True,
             "virtual_round_enabled": False,
-            "virtual_decision": "pending_coding",
+            "virtual_decision": "manual_aptitude_promoted",
         })
+        next_round_label = "Aptitude Assessment Test"
+        promoted_label = "aptitude round"
     else:
         update_fields.update({
             "virtual_round_enabled": True,
             "virtual_decision": "promoted",
         })
+        next_round_label = "AI Avatar Virtual Interview"
+        promoted_label = "virtual round"
 
     users.update_one({"_id": object_id}, {"$set": update_fields})
 
@@ -3499,13 +3817,13 @@ def promote_virtual(id):
         "zyra Next Assessment Round",
         [
             "Congratulations! You have been manually promoted by the recruiting team.",
-            f"Please login to your dashboard and complete your {'Coding Assessment' if enable_coding else 'AI Avatar Virtual Interview'} next.",
+            f"Please login to your dashboard and complete your {next_round_label} next.",
             "Your login credentials are below:"
         ]
     )
 
     if sent:
-        return jsonify({"message": f"Candidate promoted to {'coding round' if enable_coding else 'virtual round'} and email sent"})
+        return jsonify({"message": f"Candidate promoted to {promoted_label} and email sent"})
     return jsonify({"message": "Candidate promoted, but email failed", "email_error": email_error}), 200
 
 
@@ -3562,6 +3880,8 @@ def generate_virtual_questions():
         return jsonify({"error": "Candidate not found"}), 404
     if not user.get("interview_taken"):
         return jsonify({"error": "Complete MCQ interview first"}), 400
+    if not user.get("aptitude_taken"):
+        return jsonify({"error": "Complete aptitude assessment first"}), 400
     if not user.get("virtual_round_enabled"):
         return jsonify({"error": "Virtual round is not enabled by HR"}), 400
     if user.get("virtual_taken"):
@@ -3574,46 +3894,17 @@ def generate_virtual_questions():
     excluded_questions.extend([str(q or "").strip() for q in user.get("virtual_questions", []) if str(q or "").strip()])
 
     try:
-        questions, last_error = generate_virtual_questions_with_fallback(
-            user,
-            VIRTUAL_QUESTION_COUNT,
-            excluded_questions=excluded_questions
-        )
+        first_question, generation_info = generate_initial_virtual_question(user, excluded_questions=excluded_questions)
     except Exception as e:
-        questions, fallback_mode = guarantee_virtual_question_count(
-            generate_deterministic_virtual_questions(user, VIRTUAL_QUESTION_COUNT * 2),
-            user,
-            VIRTUAL_QUESTION_COUNT,
-            excluded_questions=excluded_questions
-        )
-        last_error = {"error": "Virtual question generation exception", "details": str(e), "fallback": fallback_mode}
+        first_question = generate_deterministic_virtual_questions(user, 1)[0]
+        generation_info = {"source": "deterministic", "error": str(e)}
 
-    if not questions:
-        questions, fallback_mode = guarantee_virtual_question_count(
-            generate_deterministic_virtual_questions(user, VIRTUAL_QUESTION_COUNT * 2),
-            user,
-            VIRTUAL_QUESTION_COUNT,
-            excluded_questions=excluded_questions
-        )
-        last_error = {"error": "Virtual question generation failed", "details": last_error, "fallback": fallback_mode}
-
-    if not questions:
-        return jsonify({"error": "Failed to generate virtual interview questions", "details": last_error}), 500
-
-    if len(questions) < VIRTUAL_QUESTION_COUNT:
-        questions, fallback_mode = guarantee_virtual_question_count(
-            questions + generate_deterministic_virtual_questions(user, VIRTUAL_QUESTION_COUNT * 3),
-            user,
-            VIRTUAL_QUESTION_COUNT,
-            excluded_questions=excluded_questions
-        )
-        last_error = {"error": "Virtual question fill used", "details": last_error, "fallback": fallback_mode}
-
-    if len(questions) < VIRTUAL_QUESTION_COUNT:
-        return jsonify({"error": "Failed to prepare enough unique virtual interview questions", "details": last_error}), 500
+    if not first_question:
+        return jsonify({"error": "Failed to generate the first virtual interview question"}), 500
 
     started_at = utc_now()
     expires_at = started_at + timedelta(seconds=VIRTUAL_TEST_DURATION_SECONDS)
+    questions = [first_question]
 
     users.update_one(
         {"_id": ObjectId(session["candidate_id"])},
@@ -3629,9 +3920,10 @@ def generate_virtual_questions():
     return jsonify({
         "questions": questions,
         "total_questions": len(questions),
+        "planned_questions": VIRTUAL_QUESTION_COUNT,
         "duration_seconds": VIRTUAL_TEST_DURATION_SECONDS,
         "expires_at": expires_at.isoformat(),
-        "generation_info": last_error
+        "generation_info": generation_info
     })
 
 
@@ -3646,6 +3938,8 @@ def generate_virtual_avatar_question():
         return jsonify({"error": "Candidate not found"}), 404
     if not user.get("interview_taken"):
         return jsonify({"error": "Complete MCQ interview first"}), 400
+    if not user.get("aptitude_taken"):
+        return jsonify({"error": "Complete aptitude assessment first"}), 400
     if not user.get("virtual_round_enabled"):
         return jsonify({"error": "Virtual round is not enabled by HR"}), 400
     if user.get("virtual_taken"):
@@ -3677,6 +3971,8 @@ def virtual_interviewer_response():
         return jsonify({"error": "Candidate not found"}), 404
     demo_user = is_demo_candidate(user)
     demo_private_mode = demo_user and not Config.DEMO_PERSIST_TEST_DATA
+    if not user.get("aptitude_taken"):
+        return jsonify({"error": "Complete aptitude assessment first"}), 400
     if not user.get("virtual_round_enabled"):
         return jsonify({"error": "Virtual round is not enabled"}), 400
     if user.get("virtual_taken"):
@@ -3736,19 +4032,36 @@ Do not use markdown.
         last_error = err
 
     if not response_text:
-        return jsonify({"error": "Failed to generate interviewer response", "details": last_error}), 500
+        response_text = "Thank you for that answer. I will use your response to move to the next question."
 
-    if current_questions and 0 <= next_index < len(current_questions):
-        adaptive_next_question = generate_adaptive_virtual_question(
-            user,
-            question,
-            answer,
-            adaptive_difficulty,
-            next_index + 1,
-            used_questions=used_question_history
-        )
+    if current_questions and 0 <= next_index < VIRTUAL_QUESTION_COUNT:
+        try:
+            adaptive_next_question = generate_adaptive_virtual_question(
+                user,
+                question,
+                answer,
+                adaptive_difficulty,
+                next_index + 1,
+                used_questions=used_question_history
+            )
+        except Exception as e:
+            print("Adaptive virtual question generation failed:", str(e))
+            adaptive_next_question = None
+
+        if not adaptive_next_question:
+            adaptive_next_question = generate_deterministic_virtual_questions(user, max(next_index + 2, 2))[-1]
+            if is_similar_question(adaptive_next_question, used_question_history):
+                role = str(user.get("job_role") or "this role").strip() or "this role"
+                adaptive_next_question = (
+                    f"Based on your previous answer, describe another {role} situation where you had to make a decision, "
+                    f"what options you considered, and what outcome you achieved. (Conversation Question {next_index + 1})"
+                )
+
         if adaptive_next_question:
-            current_questions[next_index] = adaptive_next_question
+            if next_index < len(current_questions):
+                current_questions[next_index] = adaptive_next_question
+            else:
+                current_questions.append(adaptive_next_question)
             users.update_one(
                 {"_id": user["_id"]},
                 {"$set": {
@@ -3763,7 +4076,10 @@ Do not use markdown.
         "response_text": cleaned[:500],
         "answer_metrics": answer_metrics,
         "next_question": adaptive_next_question,
-        "next_difficulty": adaptive_difficulty
+        "next_difficulty": adaptive_difficulty,
+        "next_index": next_index,
+        "planned_questions": VIRTUAL_QUESTION_COUNT,
+        "complete": next_index >= VIRTUAL_QUESTION_COUNT
     })
 
 
@@ -3784,6 +4100,8 @@ def submit_virtual():
         return jsonify({"error": "Candidate not found"}), 404
     demo_user = is_demo_candidate(user)
     demo_private_mode = demo_user and not Config.DEMO_PERSIST_TEST_DATA
+    if not user.get("aptitude_taken"):
+        return jsonify({"error": "Complete aptitude assessment first"}), 400
     if not user.get("virtual_round_enabled"):
         return jsonify({"error": "Virtual round is not enabled"}), 400
     if user.get("virtual_taken"):
@@ -3923,13 +4241,15 @@ Return ONLY valid JSON:
         completion_email_error = None
         sent, completion_email_error = send_email(
             user["email"],
-            "zyra Interview Completion Update",
+            "zyra Interview Stages Completed",
             f"""
 Hello {user['first_name']},
 
-Thank you for applying to zyra and completing your AI avatar interview for the {user.get('job_role', 'selected')} role.
+Thank you for applying to zyra for the {user.get('job_role', 'selected')} role.
 
-We have received your responses successfully. Our team will review the results and get back to you soon.
+You have completed all stages of our interview process, including the MCQ test, aptitude assessment, and AI avatar interview.
+
+We have received your responses successfully. Our HR team will review your complete interview report and get back to you soon.
 
 Regards,
 zyra HR
@@ -3979,7 +4299,11 @@ def candidate_login():
         demo_user and (
             user.get("virtual_taken")
             or str(user.get("status") or "").strip().lower() != "selected"
-            or (user.get("interview_taken") and not user.get("virtual_round_enabled"))
+            or (
+                user.get("interview_taken")
+                and not user.get("aptitude_round_enabled")
+                and not user.get("virtual_round_enabled")
+            )
         )
     )
     if demo_needs_reset:
@@ -4024,6 +4348,10 @@ def candidate_login():
         "interview_taken": user.get("interview_taken", False),
         "score": user.get("score"),
         "mcq_total_questions": user.get("mcq_total_questions", MCQ_QUESTION_COUNT),
+        "aptitude_round_enabled": user.get("aptitude_round_enabled", False),
+        "aptitude_taken": user.get("aptitude_taken", False),
+        "aptitude_score_percent": user.get("aptitude_score_percent"),
+        "aptitude_total_questions": user.get("aptitude_total_questions", APTITUDE_QUESTION_COUNT),
         "coding_round_enabled": user.get("coding_round_enabled", False),
         "coding_taken": user.get("coding_taken", False),
         "coding_score": user.get("coding_score"),
@@ -4186,14 +4514,27 @@ def submit_test():
         "coding_questions": [],
         "coding_answers": [],
         "coding_duration_seconds": None,
-        "virtual_round_enabled": bool(auto_qualified),
+        "aptitude_round_enabled": bool(auto_qualified),
+        "aptitude_taken": False,
+        "aptitude_score": None,
+        "aptitude_score_percent": None,
+        "aptitude_raw_score": None,
+        "aptitude_total_questions": None,
+        "aptitude_duration_seconds": None,
+        "aptitude_time_expired": False,
+        "aptitude_auto_submitted": False,
+        "aptitude_proctoring_violations": 0,
+        "aptitude_answers": [],
+        "aptitude_questions": [],
+        "aptitude_completed_at": None,
+        "virtual_round_enabled": False,
         "virtual_taken": False,
         "virtual_score": None,
         "virtual_questions": [],
         "virtual_answers": [],
         "virtual_feedback": None,
         "virtual_duration_seconds": None,
-        "virtual_decision": "promoted" if auto_qualified else "pending",
+        "virtual_decision": "pending_aptitude" if auto_qualified else "pending_mcq_review",
         "bias_review_required": not auto_qualified,
         "updated_at": utc_now()
     }
@@ -4220,7 +4561,7 @@ def submit_test():
 
     email_error = None
     if auto_qualified and not demo_user:
-        next_round_label = "AI Avatar Virtual Interview"
+        next_round_label = "Aptitude Assessment Test"
         sent, email_error = send_email(
             user["email"],
             f"zyra {next_round_label}",
@@ -4229,7 +4570,202 @@ Hello {user['first_name']},
 
 Congratulations! You scored {score_percent}% in the MCQ round, which meets the {MCQ_PROMOTION_THRESHOLD_PERCENT:.0f}% promotion criteria.
 
-Your profile has been promoted automatically to the next round. Please log in and complete your {next_round_label}.
+Your profile has been promoted automatically to Stage 2. Please log in and complete your {next_round_label}.
+
+Regards,
+zyra HR
+"""
+        )
+        if not sent:
+            email_error = email_error or "Failed to send promotion email"
+
+    return jsonify({
+        "score": score,
+        "score_percent": score_percent,
+        "raw_score": score_raw,
+        "total_questions": total_questions,
+        "promoted_to_aptitude": bool(auto_qualified),
+        "promoted_to_virtual": False,
+        "promoted_to_coding": False,
+        "next_stage": "aptitude" if auto_qualified else "hr_review",
+        "promotion_threshold_percent": MCQ_PROMOTION_THRESHOLD_PERCENT,
+        "duration_seconds": elapsed_seconds,
+        "time_expired": bool(mcq_time_expired),
+        "auto_submitted": bool(auto_submitted),
+        "email_error": email_error
+    })
+
+
+@app.route("/api/aptitude/start", methods=["POST"])
+def start_aptitude_test():
+    if not session.get("candidate_id"):
+        return jsonify({"error": "Unauthorized"}), 403
+
+    user = users.find_one({"_id": ObjectId(session["candidate_id"])})
+    if not user:
+        return jsonify({"error": "Candidate not found"}), 404
+    if user.get("status") == "rejected":
+        return jsonify({"error": "Your candidature is currently on hold. We will get back to you."}), 403
+    if not user.get("interview_taken"):
+        return jsonify({"error": "Complete the MCQ test first"}), 400
+    if not user.get("aptitude_round_enabled"):
+        return jsonify({"error": "Aptitude assessment is not enabled yet"}), 403
+    if user.get("aptitude_taken"):
+        return jsonify({"error": "Aptitude assessment already submitted"}), 400
+
+    session_seed = uuid.uuid4().hex[:12]
+    try:
+        recent_question_bank = get_recent_mcq_question_texts(limit=160)
+        questions_data, last_error = generate_aptitude_questions_with_fallback(
+            user,
+            APTITUDE_QUESTION_COUNT,
+            session_seed=session_seed,
+            excluded_questions=recent_question_bank
+        )
+    except Exception as e:
+        print("APTITUDE TEST ERROR:", str(e))
+        last_error = {"error": "Aptitude generation exception", "details": str(e)}
+        questions_data = None
+
+    if not questions_data:
+        print("APTITUDE GENERATION ERROR:", last_error)
+        questions_data = generate_deterministic_aptitude_questions(
+            APTITUDE_QUESTION_COUNT,
+            session_seed=session_seed,
+            excluded_questions=recent_question_bank if "recent_question_bank" in locals() else None
+        )
+
+    test_id = str(uuid.uuid4())
+    started_at = utc_now()
+    expires_at = started_at + timedelta(seconds=APTITUDE_TEST_DURATION_SECONDS)
+    tests.insert_one({
+        "test_id": test_id,
+        "assessment_type": "aptitude",
+        "user_id": session["candidate_id"],
+        "variation_seed": session_seed,
+        "created_at": started_at,
+        "expires_at": expires_at,
+        "duration_seconds": APTITUDE_TEST_DURATION_SECONDS,
+        "questions": questions_data
+    })
+
+    return jsonify({
+        "test_id": test_id,
+        "questions": [
+            {
+                "id": q["id"],
+                "category": q.get("category", "Aptitude"),
+                "question": q["question"],
+                "options": q["options"]
+            }
+            for q in questions_data
+        ],
+        "total_questions": len(questions_data),
+        "duration_seconds": APTITUDE_TEST_DURATION_SECONDS,
+        "expires_at": expires_at.isoformat()
+    })
+
+
+@app.route("/api/aptitude/submit", methods=["POST"])
+def submit_aptitude_test():
+    if not session.get("candidate_id"):
+        return jsonify({"error": "Unauthorized"}), 403
+
+    data = request.get_json() or {}
+    test_id = str(data.get("test_id", "")).strip()
+    answers = data.get("answers", [])
+    auto_submitted = bool(data.get("auto_submitted", False))
+    if not test_id:
+        return jsonify({"error": "test_id is required"}), 400
+    if not isinstance(answers, list):
+        return jsonify({"error": "answers must be a list"}), 400
+
+    test = tests.find_one({
+        "test_id": test_id,
+        "user_id": session["candidate_id"],
+        "assessment_type": "aptitude"
+    })
+    if not test:
+        return jsonify({"error": "Invalid aptitude assessment session"}), 400
+
+    score_raw = 0
+    total_questions = len(test.get("questions", []))
+    answer_map = {item.get("id"): item.get("answer") for item in answers if isinstance(item, dict)}
+    for q in test.get("questions", []):
+        if answer_map.get(q.get("id")) == q.get("answer"):
+            score_raw += 1
+
+    elapsed_seconds = elapsed_seconds_since(test.get("created_at"))
+    duration_seconds = int(test.get("duration_seconds", APTITUDE_TEST_DURATION_SECONDS) or APTITUDE_TEST_DURATION_SECONDS)
+    time_expired = elapsed_seconds > duration_seconds
+    if time_expired:
+        auto_submitted = True
+
+    score = round((score_raw / total_questions) * 10, 1) if total_questions else 0.0
+    score_percent = round((score_raw / total_questions) * 100, 1) if total_questions else 0.0
+    proctoring_violations = int(data.get("proctoring_violations", 0) or 0)
+    completed_at = utc_now()
+
+    user = users.find_one({"_id": ObjectId(session["candidate_id"])})
+    if not user:
+        return jsonify({"error": "Candidate not found"}), 404
+    demo_user = is_demo_candidate(user)
+    demo_private_mode = demo_user and not Config.DEMO_PERSIST_TEST_DATA
+    auto_qualified = score_percent >= APTITUDE_PROMOTION_THRESHOLD_PERCENT or (demo_user and Config.DEMO_ALWAYS_PROMOTE) or bool(user.get("workflow_demo_override"))
+    aptitude_update = {
+        "aptitude_taken": True,
+        "aptitude_score": score,
+        "aptitude_score_percent": score_percent,
+        "aptitude_raw_score": score_raw,
+        "aptitude_total_questions": total_questions,
+        "aptitude_duration_seconds": elapsed_seconds,
+        "aptitude_time_expired": bool(time_expired),
+        "aptitude_auto_submitted": bool(auto_submitted),
+        "aptitude_proctoring_violations": max(0, proctoring_violations),
+        "aptitude_answers": [] if demo_private_mode else answers,
+        "aptitude_questions": [] if demo_private_mode else test.get("questions", []),
+        "aptitude_completed_at": completed_at,
+        "virtual_round_enabled": bool(auto_qualified),
+        "virtual_taken": False,
+        "virtual_score": None,
+        "virtual_questions": [],
+        "virtual_answers": [],
+        "virtual_feedback": None,
+        "virtual_duration_seconds": None,
+        "virtual_decision": "promoted" if auto_qualified else "pending_aptitude_review",
+        "bias_review_required": not auto_qualified,
+        "updated_at": completed_at
+    }
+    if auto_qualified:
+        aptitude_update["credential_login_count"] = 0
+        aptitude_update["credential_login_limit"] = max(1, int(Config.MAX_LOGIN_ATTEMPTS))
+    aptitude_snapshot = dict(user)
+    aptitude_snapshot.update(aptitude_update)
+    aptitude_update["candidate_report"] = build_candidate_report(aptitude_snapshot)
+    users.update_one({"_id": ObjectId(session["candidate_id"])}, {"$set": aptitude_update})
+    tests.update_one(
+        {"test_id": test_id},
+        {"$set": {
+            "submitted_at": completed_at,
+            "elapsed_seconds": elapsed_seconds,
+            "time_expired": bool(time_expired),
+            "auto_submitted": bool(auto_submitted),
+            "score_percent": score_percent,
+            "raw_score": score_raw
+        }}
+    )
+
+    email_error = None
+    if auto_qualified and not demo_user:
+        sent, email_error = send_email(
+            user["email"],
+            "zyra AI Avatar Virtual Interview",
+            f"""
+Hello {user['first_name']},
+
+Congratulations! You scored {score_percent}% in the aptitude round, which meets the {APTITUDE_PROMOTION_THRESHOLD_PERCENT:.0f}% promotion criteria.
+
+Your profile has been promoted automatically to the AI Avatar Virtual Interview. Please log in and complete the next round.
 
 Regards,
 zyra HR
@@ -4244,11 +4780,10 @@ zyra HR
         "raw_score": score_raw,
         "total_questions": total_questions,
         "promoted_to_virtual": bool(auto_qualified),
-        "promoted_to_coding": False,
-        "next_stage": "virtual" if auto_qualified else "bias_review",
-        "promotion_threshold_percent": MCQ_PROMOTION_THRESHOLD_PERCENT,
+        "next_stage": "virtual" if auto_qualified else "hr_review",
+        "promotion_threshold_percent": APTITUDE_PROMOTION_THRESHOLD_PERCENT,
         "duration_seconds": elapsed_seconds,
-        "time_expired": bool(mcq_time_expired),
+        "time_expired": bool(time_expired),
         "auto_submitted": bool(auto_submitted),
         "email_error": email_error
     })
@@ -4447,6 +4982,9 @@ def session_status():
         if user:
             candidate_state = {
                 "interview_taken": bool(user.get("interview_taken", False)),
+                "aptitude_round_enabled": bool(user.get("aptitude_round_enabled", False)),
+                "aptitude_taken": bool(user.get("aptitude_taken", False)),
+                "aptitude_score_percent": user.get("aptitude_score_percent"),
                 "coding_round_enabled": bool(user.get("coding_round_enabled", False)),
                 "coding_taken": bool(user.get("coding_taken", False)),
                 "virtual_round_enabled": bool(user.get("virtual_round_enabled", False)),

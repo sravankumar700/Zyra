@@ -18,13 +18,17 @@
   function applyState(state) {
     const mcqCard = document.getElementById('mcq-module-card');
     const mcqBtn = document.getElementById('mcq-module-btn');
+    const aptitudeCard = document.getElementById('aptitude-module-card');
+    const aptitudeBtn = document.getElementById('aptitude-module-btn');
     const avatarCard = document.getElementById('avatar-module-card');
     const avatarBtn = document.getElementById('avatar-module-btn');
 
-    if (!state?.logged_in && !state?.interview_taken && !state?.virtual_round_enabled) {
+    if (!state?.logged_in && !state?.interview_taken && !state?.aptitude_round_enabled && !state?.virtual_round_enabled) {
       setButtonLocked(mcqBtn, 'Login Required');
+      setButtonLocked(aptitudeBtn, 'Login Required');
       setButtonLocked(avatarBtn, 'Login Required');
       mcqCard?.classList.add('disabled');
+      aptitudeCard?.classList.add('disabled');
       avatarCard?.classList.add('disabled');
       return;
     }
@@ -37,6 +41,17 @@
       setButtonUnlocked(mcqBtn, 'MCQ Test');
     }
 
+    if (state.aptitude_taken) {
+      aptitudeCard?.classList.add('disabled');
+      setButtonLocked(aptitudeBtn, 'Aptitude Completed');
+    } else if (state.aptitude_round_enabled && state.interview_taken) {
+      aptitudeCard?.classList.remove('disabled');
+      setButtonUnlocked(aptitudeBtn, 'Start Aptitude');
+    } else {
+      aptitudeCard?.classList.add('disabled');
+      setButtonLocked(aptitudeBtn, 'Locked Until MCQ Pass');
+    }
+
     if (state.virtual_round_enabled && !state.virtual_taken) {
       avatarCard?.classList.remove('disabled');
       setButtonUnlocked(avatarBtn, 'Start Interview');
@@ -45,7 +60,7 @@
       setButtonLocked(avatarBtn, 'Interview Completed');
     } else {
       avatarCard?.classList.add('disabled');
-      setButtonLocked(avatarBtn, 'Locked Until MCQ Pass');
+      setButtonLocked(avatarBtn, 'Locked Until Aptitude Pass');
     }
   }
 

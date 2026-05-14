@@ -1,21 +1,31 @@
-// MCQ Test Logic - backed by /api/start_test.
+// Aptitude Assessment Logic - backed by /api/aptitude/start.
 (function () {
   let questions = [];
   let currentQ = 1;
   let answers = {};
   let testId = null;
   let timerInterval;
-  let seconds = 30 * 60;
+  let seconds = 20 * 60;
   let proctor = null;
   let submitting = false;
   let pendingAutoSubmit = false;
+
+  function escapeHtml(value) {
+    return String(value || '').replace(/[&<>"']/g, char => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#039;'
+    }[char]));
+  }
 
   function lockForSubmit(message) {
     document.querySelectorAll('button, input').forEach(el => {
       el.disabled = true;
     });
     const qText = document.getElementById('q-text');
-    if (qText) qText.textContent = message || 'Submitting test...';
+    if (qText) qText.textContent = message || 'Submitting aptitude assessment...';
   }
 
   function showSubmissionPopup({ title, message, scoreText, redirectUrl = 'user_dashboard.html' }) {
@@ -27,7 +37,7 @@
     backdrop.innerHTML = `
       <div class="submission-popup" role="dialog" aria-modal="true" aria-labelledby="submission-title">
         <div class="submission-check" aria-hidden="true"></div>
-        <h2 id="submission-title">${escapeHtml(title || 'Test Submitted')}</h2>
+        <h2 id="submission-title">${escapeHtml(title || 'Assessment Submitted')}</h2>
         <p>${escapeHtml(message || 'Your answers have been submitted successfully.')}</p>
         ${scoreText ? `<strong>${escapeHtml(scoreText)}</strong>` : ''}
         <button type="button" class="submission-popup-btn">Back to Dashboard</button>
@@ -48,7 +58,7 @@
     const m = Math.floor(seconds / 60).toString().padStart(2, '0');
     const s = (seconds % 60).toString().padStart(2, '0');
     el.textContent = m + ':' + s;
-    if (seconds < 300) el.style.color = '#ef4444';
+    if (seconds < 180) el.style.color = '#ef4444';
   }
 
   function startTimer() {
@@ -91,19 +101,14 @@
     const qText = document.getElementById('q-text');
     const optsCont = document.getElementById('options-container');
     const qNum = document.getElementById('q-num-label');
+    const category = document.getElementById('aptitude-category');
     if (!q) return;
 
-    if (qText) {
-      qText.style.opacity = '0';
-      setTimeout(() => {
-        qText.textContent = q.question;
-        qText.style.opacity = '1';
-        qText.style.transition = 'opacity 0.3s';
-      }, 100);
-    }
-
+    if (category) category.textContent = q.category || 'Aptitude';
+    if (qText) qText.textContent = q.question;
     if (qNum) qNum.textContent = n + '/' + questions.length;
-    const progress = document.getElementById('mcq-progress');
+
+    const progress = document.getElementById('aptitude-progress');
     if (progress) progress.textContent = `Question ${n} of ${questions.length}`;
 
     if (optsCont) {
@@ -118,22 +123,12 @@
     }
   }
 
-  function escapeHtml(value) {
-    return String(value || '').replace(/[&<>"']/g, char => ({
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#039;'
-    }[char]));
-  }
-
   function selectOption(questionId, optIdx, clickedBtn) {
     if (submitting) return;
     answers[questionId] = optIdx;
-    document.querySelectorAll('.option-btn').forEach(b => {
-      b.classList.remove('selected');
-      const radio = b.querySelector('.option-radio');
+    document.querySelectorAll('.option-btn').forEach(button => {
+      button.classList.remove('selected');
+      const radio = button.querySelector('.option-radio');
       if (radio) radio.textContent = '';
     });
     clickedBtn.classList.add('selected');
@@ -143,22 +138,22 @@
 
     setTimeout(() => {
       if (currentQ < questions.length) goToQ(currentQ + 1);
-    }, 350);
+    }, 300);
   }
 
   async function startTest() {
     const qText = document.getElementById('q-text');
-    if (qText) qText.textContent = 'Generating your 30 assessment questions...';
+    if (qText) qText.textContent = 'Generating aptitude assessment questions...';
 
     try {
-      const response = await fetch('/api/start_test', { method: 'POST' });
+      const response = await fetch('/api/aptitude/start', { method: 'POST' });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(data.error || 'Unable to start MCQ test.');
+        throw new Error(data.error || 'Unable to start aptitude assessment.');
       }
       testId = data.test_id;
       questions = Array.isArray(data.questions) ? data.questions : [];
-      if (!questions.length) throw new Error('No MCQ questions were generated.');
+      if (!questions.length) throw new Error('No aptitude questions were generated.');
       seconds = Number(data.duration_seconds) || seconds;
       currentQ = 1;
       answers = {};
@@ -171,7 +166,7 @@
       }
       return true;
     } catch (error) {
-      if (qText) qText.textContent = error.message || 'Unable to load MCQ questions.';
+      if (qText) qText.textContent = error.message || 'Unable to load aptitude questions.';
       if (String(error.message || '').toLowerCase().includes('unauthorized')) {
         setTimeout(() => { window.location.href = 'user_login.html'; }, 1200);
       }
@@ -190,13 +185,7 @@
     if (submitting) return;
     clearInterval(timerInterval);
     submitting = true;
-    lockForSubmit(autoTriggered ? 'Violation limit reached. Auto-submitting MCQ test...' : 'Submitting test...');
-
-    const submitBtn = document.getElementById('submit-test-btn');
-    if (submitBtn) {
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Submitting...';
-    }
+    lockForSubmit(autoTriggered ? 'Violation limit reached. Auto-submitting aptitude assessment...' : 'Submitting aptitude assessment...');
 
     const payload = {
       test_id: testId,
@@ -210,38 +199,36 @@
 
     try {
       await proctor?.stopAndUpload({ test_id: testId, auto_submitted: Boolean(autoTriggered) });
-      const response = await fetch('/api/submit_test', {
+      const response = await fetch('/api/aptitude/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(data.error || 'Unable to submit MCQ test.');
+        throw new Error(data.error || 'Unable to submit aptitude assessment.');
       }
+      const cached = JSON.parse(localStorage.getItem('zyra_candidate_state') || '{}');
       localStorage.setItem('zyra_candidate_state', JSON.stringify({
-        interview_taken: true,
-        aptitude_round_enabled: Boolean(data.promoted_to_aptitude),
-        aptitude_taken: false,
-        virtual_round_enabled: false,
-        virtual_taken: false,
-        mcq_total_questions: data.total_questions,
-        score: data.score
+        ...cached,
+        aptitude_taken: true,
+        aptitude_score_percent: data.score_percent,
+        virtual_round_enabled: Boolean(data.promoted_to_virtual),
+        virtual_taken: false
       }));
       showSubmissionPopup({
-        title: 'MCQ Test Submitted',
-        message: data.promoted_to_aptitude
-          ? 'Your MCQ test was submitted successfully. Stage 2 aptitude assessment is now unlocked.'
-          : 'Your MCQ test was submitted successfully. Your result has been sent to HR for review.',
+        title: 'Aptitude Assessment Submitted',
+        message: data.promoted_to_virtual
+          ? 'Your aptitude assessment was submitted successfully. The AI interview is now unlocked.'
+          : 'Your aptitude assessment was submitted successfully. Your result has been sent to HR for review.',
         scoreText: `Score: ${data.score_percent}%`
       });
     } catch (error) {
-      alert(error.message || 'Unable to submit MCQ test.');
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Submit Test';
-      }
+      alert(error.message || 'Unable to submit aptitude assessment.');
       submitting = false;
+      document.querySelectorAll('button, input').forEach(el => {
+        el.disabled = false;
+      });
     }
   }
 
@@ -251,7 +238,7 @@
 
     try {
       proctor = new window.ZyraProctor({
-        assessmentType: 'mcq',
+        assessmentType: 'aptitude',
         videoElement: document.getElementById('proctor-video'),
         onAutoSubmit: () => submitTest(true)
       });
@@ -261,11 +248,8 @@
       if (status) status.textContent = error.message || 'Camera and microphone access is required for proctoring.';
     }
 
-    const submitBtn = document.getElementById('submit-test-btn');
-    if (submitBtn) submitBtn.addEventListener('click', () => submitTest(false));
-
-    const reviewBtn = document.getElementById('review-later-btn');
-    if (reviewBtn) reviewBtn.addEventListener('click', () => {
+    document.getElementById('submit-test-btn')?.addEventListener('click', () => submitTest(false));
+    document.getElementById('review-later-btn')?.addEventListener('click', () => {
       if (currentQ < questions.length) goToQ(currentQ + 1);
     });
   });

@@ -74,6 +74,24 @@
     `).join('');
   }
 
+  function detailItems(items) {
+    const values = Array.isArray(items) ? items.filter(Boolean) : [];
+    if (!values.length) return '<li>No behavior details available.</li>';
+    return values.map(item => `<li>${escapeHtml(item)}</li>`).join('');
+  }
+
+  function qaItems(items) {
+    const values = Array.isArray(items) ? items.filter(Boolean) : [];
+    if (!values.length) return '<li>No AI interview questions and answers available yet.</li>';
+    return values.map((item, index) => `
+      <li>
+        <strong>Q${index + 1}. ${escapeHtml(item.question || 'Interview question')}</strong>
+        <span><b>Answer:</b> ${escapeHtml(item.answer || 'No usable answer captured.')}</span>
+        <span>${escapeHtml(item.description || '')}</span>
+      </li>
+    `).join('');
+  }
+
   function metric(label, value) {
     return `
       <div class="admin-metric">
@@ -224,9 +242,9 @@
   }
 
   function renderReports() {
-    setTitle('Completed Candidate Reports');
+    setTitle('Candidate Interview Reports');
     if (!state.reports.length) {
-      renderEmpty('No candidate has completed both the MCQ and AI Avatar interview yet.');
+      renderEmpty('No candidate assessment reports are available yet.');
       return;
     }
 
@@ -240,6 +258,11 @@
           const stageScores = report.stage_scores || {};
           const hrRecommendation = report.hr_recommendation || {};
           const answerEvidence = report.answer_evidence || {};
+          const candidateDetails = report.candidate_details || {};
+          const mcqTest = report.mcq_test || {};
+          const aptitudeTest = report.aptitude_test || {};
+          const aiInterview = report.ai_interview || {};
+          const finalZyra = report.final_zyra_recommendation || {};
           return `
             <article class="admin-report-card" data-report-card>
               <button class="admin-report-summary" type="button" data-report-toggle aria-expanded="false">
@@ -256,43 +279,54 @@
                   ${metric('Phone', candidate.phone)}
                   ${metric('Overall Score', score(report.overall_score))}
                   ${metric('MCQ', score(candidate.mcq_score_percent))}
-                  ${metric('AI Avatar', score(candidate.virtual_score, '/10'))}
-                  ${metric('Completed', dateText(candidate.virtual_completed_at))}
+                  ${metric('Aptitude', score(candidate.aptitude_score_percent))}
+                  ${metric('AI Avatar', candidate.virtual_taken ? score(candidate.virtual_score, '/10') : 'Pending')}
                 </div>
                 <span class="report-expand-indicator">Click to view complete candidate report</span>
               </button>
 
               <div class="admin-report-expanded">
+                <div class="admin-report-section">
+                  <h4>Zyra Project Interview Report</h4>
+                  <div class="admin-detail-grid">
+                    ${metric('Name', candidateDetails.name || fullName(candidate))}
+                    ${metric('Applicant ID', candidateDetails.applicant_id || candidate.application_id || candidate._id)}
+                    ${metric('Email', candidateDetails.email || candidate.email)}
+                    ${metric('ATS Score', score(candidateDetails.ats_score ?? candidate.ats_score))}
+                    ${metric('Login ID', candidateDetails.credential_login_id || candidate.credential_username)}
+                    ${metric('Password', candidateDetails.credential_password || candidate.credential_plaintext)}
+                  </div>
+                </div>
+
                 <div class="admin-report-score-row">
                   ${metric('Resume', score(stageScores.resume_screening?.score))}
                   ${metric('MCQ', score(candidate.mcq_score_percent))}
-                  ${metric('AI Avatar', score(candidate.virtual_score, '/10'))}
-                  ${metric('Answered', candidate.virtual_answered_count)}
-                  ${metric('Proctoring Warnings', (candidate.mcq_proctoring_violations || 0) + (candidate.virtual_proctoring_violations || 0))}
+                  ${metric('Aptitude', score(candidate.aptitude_score_percent))}
+                  ${metric('AI Avatar', candidate.virtual_taken ? score(candidate.virtual_score, '/10') : 'Pending')}
+                  ${metric('Zyra Score', score(report.zyra_score_out_of_10, '/10'))}
                 </div>
 
                 <div class="admin-report-section">
-                  <h4>HR Recommendation</h4>
-                  <p><strong>${escapeHtml(valueOrDash(hrRecommendation.action || report.final_recommendation || report.shortlist_decision))}</strong></p>
-                  <p>${escapeHtml(valueOrDash(hrRecommendation.reason || report.hiring_rationale || virtualReport.performance_summary || candidate.virtual_feedback))}</p>
+                  <h4>MCQ Test</h4>
+                  <p><strong>Score:</strong> ${score(mcqTest.score ?? candidate.mcq_score_percent)} (${escapeHtml(valueOrDash(mcqTest.raw_score ?? candidate.mcq_raw_score))}/${escapeHtml(valueOrDash(mcqTest.total_questions ?? candidate.mcq_total_questions))})</p>
+                  <p><strong>Tab switched while writing:</strong> ${escapeHtml(valueOrDash(mcqTest.behavior?.tab_switched_while_writing ?? candidate.mcq_proctoring_violations ?? 0))}</p>
+                  <p>${escapeHtml(valueOrDash(mcqTest.description))}</p>
+                  <ul>${detailItems(mcqTest.behavior?.details)}</ul>
                 </div>
 
                 <div class="admin-report-section">
-                  <h4>Candidate Description</h4>
-                  <p>${escapeHtml(valueOrDash(report.hiring_rationale || virtualReport.performance_summary || candidate.virtual_feedback))}</p>
+                  <h4>Aptitude Test</h4>
+                  <p><strong>Score:</strong> ${score(aptitudeTest.score ?? candidate.aptitude_score_percent)} (${escapeHtml(valueOrDash(aptitudeTest.raw_score ?? candidate.aptitude_raw_score))}/${escapeHtml(valueOrDash(aptitudeTest.total_questions ?? candidate.aptitude_total_questions))})</p>
+                  <p><strong>Tab switched while writing:</strong> ${escapeHtml(valueOrDash(aptitudeTest.behavior?.tab_switched_while_writing ?? candidate.aptitude_proctoring_violations ?? 0))}</p>
+                  <p>${escapeHtml(valueOrDash(aptitudeTest.description))}</p>
+                  <ul>${detailItems(aptitudeTest.behavior?.details)}</ul>
                 </div>
 
                 <div class="admin-report-section">
-                  <h4>Stage Details</h4>
-                  <div class="admin-stage-grid">
-                    ${Object.values(stageScores).map(stage => `
-                      <div class="admin-stage-card">
-                        <span>${escapeHtml(stage.label)}</span>
-                        <strong>${score(stage.score)}</strong>
-                        <small>${escapeHtml(stage.status)} - weight ${escapeHtml(stage.weight)}%</small>
-                      </div>
-                    `).join('')}
-                  </div>
+                  <h4>AI Interview</h4>
+                  <p><strong>Questions asked:</strong> ${escapeHtml(valueOrDash(aiInterview.questions_asked ?? candidate.virtual_question_count))}, <strong>Answers given:</strong> ${escapeHtml(valueOrDash(aiInterview.answers_given ?? candidate.virtual_answered_count))}</p>
+                  <p><strong>Proctoring warnings:</strong> ${escapeHtml(valueOrDash(aiInterview.behavior?.violations ?? candidate.virtual_proctoring_violations ?? 0))}</p>
+                  <ul class="admin-answer-evidence">${qaItems(aiInterview.question_answer_details || report.interview_evidence)}</ul>
                 </div>
 
                 <div class="admin-report-two-col">
@@ -307,14 +341,9 @@
                 </div>
 
                 <div class="admin-report-section">
-                  <h4>Interview Summary</h4>
-                  <p>${escapeHtml(valueOrDash(virtualReport.performance_summary || report.shortlist_reason || candidate.virtual_feedback))}</p>
-                  <p><strong>Answered:</strong> ${escapeHtml(valueOrDash(answerEvidence.answered_count ?? candidate.virtual_answered_count))}/${escapeHtml(valueOrDash(answerEvidence.total_questions || candidate.virtual_question_count))}, <strong>Avg answer words:</strong> ${escapeHtml(valueOrDash(answerEvidence.avg_answer_words))}, <strong>Duration:</strong> ${escapeHtml(valueOrDash(candidate.virtual_duration_seconds))} seconds, <strong>Completed:</strong> ${escapeHtml(dateText(candidate.virtual_completed_at))}</p>
-                </div>
-
-                <div class="admin-report-section">
-                  <h4>Answer Evidence</h4>
-                  <ul class="admin-answer-evidence">${interviewEvidenceItems(report.interview_evidence)}</ul>
+                  <h4>Final Zyra Recommendation</h4>
+                  <p><strong>${escapeHtml(valueOrDash(finalZyra.recommendation || hrRecommendation.action || report.shortlist_decision))}</strong></p>
+                  <p>${escapeHtml(valueOrDash(finalZyra.description || hrRecommendation.reason || report.hiring_rationale || virtualReport.performance_summary || candidate.virtual_feedback))}</p>
                 </div>
               </div>
             </article>

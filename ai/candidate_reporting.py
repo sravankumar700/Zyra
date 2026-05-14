@@ -8,15 +8,16 @@ from typing import Any, Dict, List, Optional
 
 
 STANDARD_STAGE_WEIGHTS = {
-    "resume_screening": 30,
-    "assessment": 30,
-    "interview": 40,
+    "resume_screening": 20,
+    "assessment": 25,
+    "aptitude": 25,
+    "interview": 30,
 }
 
 TECHNICAL_STAGE_WEIGHTS = {
-    "resume_screening": 25,
+    "resume_screening": 20,
     "assessment": 25,
-    "coding_round": 20,
+    "aptitude": 25,
     "interview": 30,
 }
 
@@ -109,9 +110,75 @@ def _build_interview_evidence(user: Dict[str, Any], limit: int = 4) -> List[Dict
     return evidence
 
 
+def _test_behavior_summary(prefix: str, user: Dict[str, Any]) -> Dict[str, Any]:
+    violations = int(user.get(f"{prefix}_proctoring_violations") or 0)
+    duration = int(user.get(f"{prefix}_duration_seconds") or 0)
+    auto_submitted = bool(user.get(f"{prefix}_auto_submitted"))
+    time_expired = bool(user.get(f"{prefix}_time_expired"))
+    total = int(user.get(f"{prefix}_total_questions") or 0)
+    raw = int(user.get(f"{prefix}_raw_score") or 0)
+
+    flags: List[str] = []
+    if violations:
+        flags.append(f"{violations} proctoring warning(s), including tab/window switch or focus-loss events where detected.")
+    else:
+        flags.append("No proctoring warning was recorded.")
+    if auto_submitted:
+        flags.append("The test was auto-submitted by policy.")
+    if time_expired:
+        flags.append("The timer expired during the attempt.")
+    if total:
+        flags.append(f"Answered/scored evidence: {raw} correct out of {total}.")
+
+    if violations >= 3:
+        behavior = "High-risk test behavior. HR should review recording, tab-switch/focus-loss logs, and timing before promotion."
+    elif violations:
+        behavior = "Minor proctoring risk. Candidate completed the test, but HR should inspect warning context."
+    else:
+        behavior = "Test behavior appears clean based on recorded proctoring signals."
+
+    if duration:
+        behavior += f" Completion time recorded: {duration} seconds."
+
+    return {
+        "violations": violations,
+        "tab_switched_while_writing": violations,
+        "auto_submitted": auto_submitted,
+        "time_expired": time_expired,
+        "behavior": behavior,
+        "details": flags,
+    }
+
+
+def _build_ai_interview_detail(user: Dict[str, Any], limit: int = 10) -> Dict[str, Any]:
+    questions = [str(item or "").strip() for item in (user.get("virtual_questions") or [])]
+    answers = [str(item or "").strip() for item in (user.get("virtual_answers") or [])]
+    pairs = []
+    for index, question in enumerate(questions[:limit]):
+        answer = answers[index] if index < len(answers) else ""
+        pairs.append({
+            "question": question,
+            "answer": answer or "No usable answer captured.",
+            "description": (
+                "Candidate provided a detailed response with role evidence."
+                if len(answer.split()) >= 35
+                else "Candidate response was brief or incomplete; HR should ask a follow-up."
+                if answer
+                else "No answer was captured for this question."
+            ),
+        })
+    return {
+        "questions_asked": len(questions),
+        "answers_given": sum(1 for answer in answers if answer),
+        "question_answer_details": pairs,
+        "behavior": _test_behavior_summary("virtual", user),
+    }
+
+
 def _build_hr_recommendation(
     overall_score: float,
     mcq_score: float,
+    aptitude_score: float,
     live_interview_score: float,
     recommendation: str,
     answer_evidence: Dict[str, Any],
@@ -161,6 +228,8 @@ def _build_hr_recommendation(
         reason += f" AI interview recommendation signal: {recommendation}."
     if mcq_score < 60:
         reason += " MCQ performance is below the normal promotion benchmark."
+    if aptitude_score and aptitude_score < 60:
+        reason += " Aptitude performance is below the normal promotion benchmark."
 
     return {
         "action": action,
@@ -184,6 +253,7 @@ def build_candidate_report(
         user.get("mcq_score_percent"),
         default=clamp_score_10(user.get("score"), default=0.0) * 10,
     )
+    aptitude_score = clamp_percent(user.get("aptitude_score_percent"), default=0.0)
     coding_score = clamp_percent(
         user.get("coding_score"),
         default=0.0,
@@ -209,20 +279,19 @@ def build_candidate_report(
             "weight": weights["assessment"],
             "status": "completed" if user.get("interview_taken") else "pending",
         },
+        "aptitude": {
+            "label": "Stage 2 - Aptitude Test",
+            "score": aptitude_score,
+            "weight": weights["aptitude"],
+            "status": "completed" if user.get("aptitude_taken") else "pending",
+        },
         "interview": {
-            "label": "Stage 3 - AI Interview" if assessment_track == "technical" else "Stage 2 - AI Interview",
+            "label": "Stage 3 - AI Interview",
             "score": live_interview_score,
             "weight": weights["interview"],
             "status": "completed" if (user.get("virtual_taken") or user.get("interview_status") == "completed" or interview_evaluation) else "pending",
         },
     }
-    if assessment_track == "technical":
-        stage_scores["coding_round"] = {
-            "label": "Stage 2 - Coding Round",
-            "score": coding_score,
-            "weight": weights["coding_round"],
-            "status": "completed" if user.get("coding_taken") else "pending",
-        }
 
     weighted_total = 0.0
     for stage in stage_scores.values():
@@ -254,6 +323,13 @@ def build_candidate_report(
             else ["Assessment performance indicates baseline capability."]
             if mcq_score >= 50
             else []
+        )
+        + (
+            ["Aptitude score shows strong reasoning and selection readiness."]
+            if aptitude_score >= 70
+            else ["Aptitude score met the baseline promotion benchmark."]
+            if aptitude_score >= 60
+            else []
         ),
         limit=5,
     )
@@ -266,11 +342,27 @@ def build_candidate_report(
             ["Assessment accuracy needs improvement."]
             if mcq_score and mcq_score < 60
             else []
+        )
+        + (
+            ["Aptitude score did not meet the automatic promotion threshold."]
+            if aptitude_score and aptitude_score < 60
+            else []
         ),
         limit=5,
     )
 
-    violation_count = int(proctoring_summary.get("violation_count") or user.get("virtual_proctoring_violations") or user.get("mcq_proctoring_violations") or 0)
+    mcq_behavior = _test_behavior_summary("mcq", user)
+    aptitude_behavior = _test_behavior_summary("aptitude", user)
+    ai_interview = _build_ai_interview_detail(user)
+    violation_count = int(
+        proctoring_summary.get("violation_count")
+        or user.get("virtual_proctoring_violations")
+        or max(
+            int(user.get("mcq_proctoring_violations") or 0),
+            int(user.get("aptitude_proctoring_violations") or 0),
+        )
+        or 0
+    )
     critical_flags = normalize_list(proctoring_summary.get("critical_flags") or [], limit=3)
     high_risk_proctoring = bool(critical_flags) or violation_count >= 3
 
@@ -300,6 +392,7 @@ def build_candidate_report(
     hr_recommendation = _build_hr_recommendation(
         overall_score,
         mcq_score,
+        aptitude_score,
         live_interview_score,
         recommendation,
         answer_evidence,
@@ -307,10 +400,45 @@ def build_candidate_report(
         high_risk_proctoring,
     )
 
+    zyra_score = clamp_score_10(overall_score / 10.0)
+    candidate_details = {
+        "name": " ".join([str(user.get("first_name") or "").strip(), str(user.get("last_name") or "").strip()]).strip() or "Candidate",
+        "applicant_id": str(user.get("application_id") or user.get("_id") or ""),
+        "email": str(user.get("email") or ""),
+        "ats_score": ats_score,
+        "credential_login_id": str(user.get("credential_username") or user.get("username") or ""),
+        "credential_password": str(user.get("credential_plaintext") or ""),
+        "credentials_sent": bool(user.get("credential_username") or user.get("username")),
+    }
+
+    final_summary = (
+        f"Candidate completed MCQ with {mcq_score}%"
+        + (f", aptitude with {aptitude_score}%" if user.get("aptitude_taken") else ", aptitude pending/manual review")
+        + (f", and AI interview score {live_interview_score / 10:.1f}/10." if user.get("virtual_taken") else ", and AI interview is pending.")
+        + f" Final Zyra score is {zyra_score}/10. {hr_recommendation.get('reason', shortlist_reason)}"
+    )
+
     return {
         "overall_score": overall_score,
         "score_out_of": 100,
+        "zyra_score_out_of_10": zyra_score,
+        "candidate_details": candidate_details,
         "stage_scores": stage_scores,
+        "mcq_test": {
+            "score": mcq_score,
+            "raw_score": user.get("mcq_raw_score"),
+            "total_questions": user.get("mcq_total_questions"),
+            "behavior": mcq_behavior,
+            "description": mcq_behavior["behavior"],
+        },
+        "aptitude_test": {
+            "score": aptitude_score,
+            "raw_score": user.get("aptitude_raw_score"),
+            "total_questions": user.get("aptitude_total_questions"),
+            "behavior": aptitude_behavior,
+            "description": aptitude_behavior["behavior"],
+        },
+        "ai_interview": ai_interview,
         "shortlist_decision": shortlist_decision,
         "shortlist_reason": shortlist_reason,
         "strengths": strengths or ["Resume matched the role sufficiently to continue evaluation."],
@@ -324,6 +452,11 @@ def build_candidate_report(
         "hr_recommendation": hr_recommendation,
         "answer_evidence": answer_evidence,
         "interview_evidence": _build_interview_evidence(user),
+        "final_zyra_recommendation": {
+            "zyra_score_out_of_10": zyra_score,
+            "recommendation": hr_recommendation.get("action") or shortlist_decision,
+            "description": final_summary,
+        },
         "hiring_rationale": str(
             hr_recommendation.get("reason")
             or interview_evaluation.get("hiring_rationale")
